@@ -17,7 +17,12 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static uploads folder (profile pictures, posts pictures)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 app.use('/assets', express.static(path.join(__dirname, '../../assets')));
 
 // Request logging middleware
