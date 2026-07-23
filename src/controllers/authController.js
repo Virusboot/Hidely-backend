@@ -181,6 +181,13 @@ exports.login = async (req, res) => {
         [emailLower, otpCode, expiresAt]
       );
 
+      // Send email containing OTP
+      try {
+        await sendOTPEmail(emailLower, otpCode);
+      } catch (emailErr) {
+        console.error('Failed to send login verification OTP email:', emailErr);
+      }
+
       console.log(`\n===========================================`);
       console.log(`[DEV] New OTP for unverified login (${emailLower}): ${otpCode}`);
       console.log(`===========================================\n`);
