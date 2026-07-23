@@ -20,6 +20,8 @@ const createTransporter = () => {
       user: user,
       pass: pass,
     },
+    // Force IPv4 to prevent ENETUNREACH errors on Render outbound connections
+    family: 4,
   });
 };
 
