@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { sendOTPEmail } = require('../config/email');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'hidely_super_secret_jwt_key_2026';
 
@@ -57,6 +58,13 @@ exports.register = async (req, res) => {
       'INSERT INTO otps (email, otp_code, expires_at) VALUES ($1, $2, $3)',
       [email.toLowerCase().trim(), otpCode, expiresAt]
     );
+
+    // Send email containing OTP
+    try {
+      await sendOTPEmail(email.toLowerCase().trim(), otpCode);
+    } catch (emailErr) {
+      console.error('Failed to send OTP email:', emailErr);
+    }
 
     // Log the OTP to console for development verification
     console.log(`\n===========================================`);
@@ -233,6 +241,13 @@ exports.forgotPassword = async (req, res) => {
       'INSERT INTO otps (email, otp_code, expires_at) VALUES ($1, $2, $3)',
       [emailLower, otpCode, expiresAt]
     );
+
+    // Send email containing OTP
+    try {
+      await sendOTPEmail(emailLower, otpCode);
+    } catch (emailErr) {
+      console.error('Failed to send forgot password OTP email:', emailErr);
+    }
 
     console.log(`\n===========================================`);
     console.log(`[DEV] Forgot Password OTP for ${emailLower}: ${otpCode}`);
