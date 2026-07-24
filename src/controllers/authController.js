@@ -59,12 +59,10 @@ exports.register = async (req, res) => {
       [email.toLowerCase().trim(), otpCode, expiresAt]
     );
 
-    // Send email containing OTP
-    try {
-      await sendOTPEmail(email.toLowerCase().trim(), otpCode);
-    } catch (emailErr) {
+    // Send email containing OTP (non-blocking background task)
+    sendOTPEmail(email.toLowerCase().trim(), otpCode).catch(emailErr => {
       console.error('Failed to send OTP email:', emailErr);
-    }
+    });
 
     // Log the OTP to console for development verification
     console.log(`\n===========================================`);
@@ -181,12 +179,10 @@ exports.login = async (req, res) => {
         [emailLower, otpCode, expiresAt]
       );
 
-      // Send email containing OTP
-      try {
-        await sendOTPEmail(emailLower, otpCode);
-      } catch (emailErr) {
+      // Send email containing OTP (non-blocking background task)
+      sendOTPEmail(emailLower, otpCode).catch(emailErr => {
         console.error('Failed to send login verification OTP email:', emailErr);
-      }
+      });
 
       console.log(`\n===========================================`);
       console.log(`[DEV] New OTP for unverified login (${emailLower}): ${otpCode}`);
@@ -249,12 +245,10 @@ exports.forgotPassword = async (req, res) => {
       [emailLower, otpCode, expiresAt]
     );
 
-    // Send email containing OTP
-    try {
-      await sendOTPEmail(emailLower, otpCode);
-    } catch (emailErr) {
+    // Send email containing OTP (non-blocking background task)
+    sendOTPEmail(emailLower, otpCode).catch(emailErr => {
       console.error('Failed to send forgot password OTP email:', emailErr);
-    }
+    });
 
     console.log(`\n===========================================`);
     console.log(`[DEV] Forgot Password OTP for ${emailLower}: ${otpCode}`);
