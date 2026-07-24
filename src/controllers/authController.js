@@ -57,37 +57,27 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Insert user (defaults: is_verified = false)
+    // Insert user (defaults: is_verified = true for instant registration)
     const newUser = await db.query(
-      'INSERT INTO users (name, email, password_hash, username) VALUES ($1, $2, $3, $4) RETURNING id, name, email, username, is_verified',
+      'INSERT INTO users (name, email, password_hash, username, is_verified) VALUES ($1, $2, $3, $4, TRUE) RETURNING id, name, email, username, is_verified',
       [name.trim(), email.toLowerCase().trim(), passwordHash, usernameClean]
     );
 
-    // Generate OTP
-    const otpCode = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+    const user = newUser.rows[0];
 
-    // Store OTP in database
-    await db.query(
-      'INSERT INTO otps (email, otp_code, expires_at) VALUES ($1, $2, $3)',
-      [email.toLowerCase().trim(), otpCode, expiresAt]
-    );
-
-    // Send email containing OTP (non-blocking background task)
-    sendOTPEmail(email.toLowerCase().trim(), otpCode).catch(emailErr => {
-      console.error('Failed to send OTP email:', emailErr);
-    });
-
-    // Log the OTP to console for development verification
-    console.log(`\n===========================================`);
-    console.log(`[DEV] OTP Code for ${email}: ${otpCode}`);
-    console.log(`===========================================\n`);
+    // Generate JWT token immediately on registration
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
     return res.status(201).json({
-      message: 'Registration successful. An OTP has been sent to your email.',
-      email: newUser.rows[0].email,
-      // For ease of local development, we can send it in response (or omit in production)
-      dev_otp: otpCode, 
+      message: 'Registration successful!',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        is_verified: user.is_verified,
+      },
     });
   } catch (error) {
     console.error('Error in registration:', error);
