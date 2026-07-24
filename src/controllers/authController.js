@@ -30,13 +30,27 @@ exports.register = async (req, res) => {
     // Check if user already exists
     const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
     if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'An account already exists with this email.' });
+      const existingUser = userCheck.rows[0];
+      if (!existingUser.is_verified) {
+        // Automatically delete unverified profile so they can re-register/verify
+        await db.query('DELETE FROM users WHERE id = $1', [existingUser.id]);
+        await db.query('DELETE FROM otps WHERE email = $1', [existingUser.email]);
+      } else {
+        return res.status(400).json({ error: 'An account already exists with this email.' });
+      }
     }
 
     // Check if username is already taken
     const usernameCheck = await db.query('SELECT * FROM users WHERE username = $1', [usernameClean]);
     if (usernameCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Username is already taken.' });
+      const existingUser = usernameCheck.rows[0];
+      if (!existingUser.is_verified) {
+        // Automatically delete unverified profile so they can re-register/verify
+        await db.query('DELETE FROM users WHERE id = $1', [existingUser.id]);
+        await db.query('DELETE FROM otps WHERE email = $1', [existingUser.email]);
+      } else {
+        return res.status(400).json({ error: 'Username is already taken.' });
+      }
     }
 
     // Hash password
