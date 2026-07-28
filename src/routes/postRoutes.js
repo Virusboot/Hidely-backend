@@ -13,11 +13,12 @@ router.get('/feed', authMiddleware.optional, postController.getFeed);
 // Get explore category posts (optional auth)
 router.get('/explore', authMiddleware.optional, postController.getExplorePosts);
 
+// Fetch saved/bookmarked posts for logged-in user (private)
+// (इसे dynamic '/:id' रूट से ऊपर कर दिया गया है ताकि Express इसे पहले मैच करे)
+router.get('/saved', authMiddleware, postController.getSavedPosts);
+
 // Get single post by ID (optional auth to verify like/bookmark status)
 router.get('/:id', authMiddleware.optional, postController.getPostById);
-
-// Fetch saved/bookmarked posts for logged-in user (private)
-router.get('/saved', authMiddleware, postController.getSavedPosts);
 
 // Toggle like on a post (private)
 router.post('/:id/like', authMiddleware, postController.toggleLike);
