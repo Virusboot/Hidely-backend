@@ -20,6 +20,9 @@ router.get('/saved', authMiddleware, postController.getSavedPosts);
 // Get single post by ID (optional auth to verify like/bookmark status)
 router.get('/:id', authMiddleware.optional, postController.getPostById);
 
+// Delete a post by ID (private)
+router.delete('/:id', authMiddleware, postController.deletePost);
+
 // Toggle like on a post (private)
 router.post('/:id/like', authMiddleware, postController.toggleLike);
 

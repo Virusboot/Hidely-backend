@@ -635,3 +635,39 @@ exports.getExplorePosts = async (req, res) => {
     return res.status(500).json({ error: 'Server error fetching explore posts.' });
   }
 };
+
+/**
+ * Delete a post by ID
+ * DELETE /api/posts/:id
+ */
+exports.deletePost = async (req, res) => {
+  const userId = req.user.id;
+  const postId = parseInt(req.params.id);
+
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'Invalid post ID.' });
+  }
+
+  try {
+    const postCheck = await db.query('SELECT * FROM posts WHERE id = $1', [postId]);
+    if (postCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found.' });
+    }
+
+    if (postCheck.rows[0].user_id !== userId) {
+      return res.status(403).json({ error: 'Unauthorized to delete this post.' });
+    }
+
+    await db.query('DELETE FROM post_likes WHERE post_id = $1', [postId]);
+    await db.query('DELETE FROM post_bookmarks WHERE post_id = $1', [postId]);
+    await db.query('DELETE FROM post_comments WHERE post_id = $1', [postId]);
+    await db.query('DELETE FROM notifications WHERE post_id = $1', [postId]);
+    await db.query('DELETE FROM posts WHERE id = $1', [postId]);
+
+    return res.status(200).json({ message: 'Post deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    return res.status(500).json({ error: 'Server error deleting post.' });
+  }
+};
+
