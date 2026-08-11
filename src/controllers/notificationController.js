@@ -60,3 +60,25 @@ exports.markAsRead = async (req, res) => {
     return res.status(500).json({ error: 'Server error marking notifications as read.' });
   }
 };
+
+/**
+ * Get unread notification count
+ * GET /api/notifications/unread-count
+ */
+exports.getUnreadCount = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const result = await db.query(
+      'SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
+      [userId]
+    );
+
+    return res.status(200).json({
+      unread_count: result.rows[0].count,
+    });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    return res.status(500).json({ error: 'Server error fetching unread count.' });
+  }
+};

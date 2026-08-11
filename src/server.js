@@ -50,6 +50,19 @@ const startServer = async () => {
     const dbTest = await db.query('SELECT NOW()');
     console.log(`PostgreSQL connection active. DB Server Time: ${dbTest.rows[0].now}`);
 
+    // Ensure user ID 1 is mapped to hidely_official
+    try {
+      await db.query(`
+        INSERT INTO users (id, name, email, password, username, points, is_verified)
+        VALUES (1, 'Hidely Official', 'admin@hidely.com', '$2b$10$UnPK41UWhV/42uLshGepx.a3v0Jj.zOQW/vXz3W.H/fDqI4Vp.KzS', 'hidely_official', 12800, true)
+        ON CONFLICT (id) DO UPDATE 
+        SET username = 'hidely_official', name = 'Hidely Official', email = 'admin@hidely.com';
+      `);
+      console.log('Admin user mappings updated to hidely_official successfully.');
+    } catch (dbErr) {
+      console.error('Error updating admin user mappings:', dbErr);
+    }
+
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`-----------------------------------------------`);
       console.log(`Hidely backend server is running on http://localhost:${PORT}`);
