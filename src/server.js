@@ -17,6 +17,14 @@ const PORT = process.env.PORT || 5050;
 app.use(cors());
 app.use(express.json());
 
+// Disable Cache Middleware
+app.use((req, res, next) => {
+  res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  res.header('Expires', '-1');
+  res.header('Pragma', 'no-cache');
+  next();
+});
+
 // Serve static uploads folder (profile pictures, posts pictures)
 const fs = require('fs');
 const uploadsDir = path.join(__dirname, '../uploads');
