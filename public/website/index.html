@@ -67,23 +67,20 @@
         .aura-1 { width: 650px; height: 650px; background: #E0F2FE; top: -150px; left: 5%; }
         .aura-2 { width: 550px; height: 550px; background: #DDD6FE; top: 250px; right: -100px; }
 
-        /* Floating Top Glass Header */
+        /* Full Width Flat White Header */
         header {
-            max-width: 1280px;
-            width: 90%;
-            margin: 20px auto 0;
-            padding: 14px 32px;
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 14px 48px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255, 255, 255, 0.88);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(124, 58, 237, 0.15);
-            border-radius: 100px;
-            box-shadow: 0 10px 30px rgba(43, 21, 100, 0.04);
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--border-light);
+            box-shadow: 0 1px 0 rgba(0,0,0,0.04);
             position: sticky;
-            top: 15px;
+            top: 0;
             z-index: 100;
         }
         .logo-img { height: 40px; object-fit: contain; }
@@ -392,11 +389,11 @@
         /* ===== PHONE (≤600px) ===== */
         @media (max-width: 600px) {
             header {
-                width: 94%;
-                padding: 10px 18px;
-                top: 10px;
-                border-radius: 60px;
-                margin: 12px auto 0;
+                width: 100%;
+                padding: 10px 16px;
+                top: 0;
+                border-radius: 0;
+                margin: 0;
             }
             .logo-img { height: 32px; }
             nav { gap: 10px; }
