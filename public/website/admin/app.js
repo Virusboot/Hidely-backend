@@ -1,6 +1,6 @@
-// Hidely Web Admin Console Application Script
-
-const API_BASE_URL = window.location.origin;
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? window.location.origin
+  : 'https://hidely-backend.onrender.com';
 
 let token = localStorage.getItem('hidely_admin_token') || '';
 let currentAdmin = JSON.parse(localStorage.getItem('hidely_admin_user') || 'null');
