@@ -228,13 +228,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 4px 20px;
+  padding: 12px 12px 24px;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 24px;
 }
 
 .admin-sidebar-logo {
-  height: 36px;
+  height: 38px;
   max-width: 180px;
   width: auto;
   object-fit: contain;
@@ -325,7 +325,8 @@ body {
 .main-content {
   margin-left: 260px;
   flex: 1;
-  padding: 32px;
+  padding: 36px 40px;
+  max-width: 1440px;
 }
 
 .top-bar {
@@ -337,13 +338,17 @@ body {
 
 .page-title h2 {
   font-family: var(--font-heading);
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.5px;
 }
 
 .page-title p {
   color: var(--text-sub);
   font-size: 14px;
+  font-weight: 500;
+  margin-top: 4px;
 }
 
 .system-status {
@@ -433,26 +438,39 @@ body {
 .section-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 20px;
-  padding: 24px;
+  border-radius: 24px;
+  padding: 32px 36px;
+  box-shadow: 0 10px 30px rgba(43, 21, 100, 0.04);
 }
 
 .section-card.margin-top {
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .section-card.max-w-600 {
-  max-width: 600px;
+  max-width: 680px;
 }
 
 .card-header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .card-header h3 {
   font-family: var(--font-heading);
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-header p {
+  font-size: 14px;
+  color: var(--text-sub);
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 .toolbar {
