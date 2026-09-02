@@ -10,10 +10,10 @@
     <title>Hidely — Social Places Discovery Platform</title>
     <meta name="description" content="Hidely is the next-gen location-contextual social platform for secret spots discovery, offline compass navigation, and travel squad stories.">
 
-    <!-- Premium Google Fonts: Outfit & Plus Jakarta Sans -->
+    <!-- Premium Google Fonts: Sora (Headings) & Inter (UI & Body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -26,11 +26,13 @@
             --pink-accent: #EC4899;
             --text-light: #F8FAFC;
             --text-muted: #94A3B8;
-            --grad-accent: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #EC4899 100%);
+            --grad-accent: linear-gradient(135deg, #A78BFA 0%, #60A5FA 50%, #F472B6 100%);
             --grad-btn: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+            --font-head: 'Sora', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-body); }
 
         body {
             background-color: var(--bg-dark);
@@ -150,11 +152,11 @@
         }
 
         .hero-title {
-            font-family: 'Outfit', sans-serif;
-            font-size: clamp(48px, 5.5vw, 72px);
-            font-weight: 900;
-            line-height: 1.06;
-            letter-spacing: -2px;
+            font-family: var(--font-head);
+            font-size: clamp(46px, 5.2vw, 70px);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -1.5px;
             color: #FFFFFF;
             margin-bottom: 24px;
         }
