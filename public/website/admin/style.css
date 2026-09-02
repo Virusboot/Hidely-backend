@@ -60,7 +60,9 @@ body {
 }
 
 .auth-brand-logo {
-  height: 56px;
+  height: 42px;
+  max-width: 220px;
+  width: auto;
   object-fit: contain;
   margin: 0 auto;
   display: block;
@@ -232,8 +234,11 @@ body {
 }
 
 .admin-sidebar-logo {
-  height: 52px;
+  height: 36px;
+  max-width: 180px;
+  width: auto;
   object-fit: contain;
+  display: block;
 }
 
 .nav-menu {
@@ -632,7 +637,9 @@ body {
   }
 
   .mobile-brand-logo {
-    height: 32px;
+    height: 30px;
+    max-width: 140px;
+    width: auto;
     object-fit: contain;
   }
 
