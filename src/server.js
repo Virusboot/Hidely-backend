@@ -89,8 +89,14 @@ if (activeWebDir) {
 
 // Start Server & Test Database Connection
 const startServer = async () => {
+  // Bind to PORT immediately so Render health checks succeed
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`-----------------------------------------------`);
+    console.log(`Hidely backend server is running on port ${PORT}`);
+    console.log(`-----------------------------------------------`);
+  });
+
   try {
-    // Sanity check for database connection
     console.log('Testing connection to PostgreSQL...');
     const dbTest = await db.query('SELECT NOW()');
     console.log(`PostgreSQL connection active. DB Server Time: ${dbTest.rows[0].now}`);
@@ -107,15 +113,8 @@ const startServer = async () => {
     } catch (dbErr) {
       console.error('Error updating admin user mappings:', dbErr.message);
     }
-
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`-----------------------------------------------`);
-      console.log(`Hidely backend server is running on http://localhost:${PORT}`);
-      console.log(`-----------------------------------------------`);
-    });
   } catch (error) {
-    console.error('CRITICAL: Database connection test failed. Server not started.', error);
-    process.exit(1);
+    console.warn('PostgreSQL connection check warning:', error.message);
   }
 };
 
