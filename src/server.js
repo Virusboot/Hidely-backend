@@ -44,6 +44,16 @@ app.get(/^\/admin/, (req, res) => {
   res.sendFile(path.join(adminPublicDir, 'index.html'));
 });
 
+// Serve Flutter Responsive Web Social App (Feeds, Posts, Map, Profile, Likes)
+const flutterAppDir = path.join(__dirname, '../public/app');
+if (!fs.existsSync(flutterAppDir)) {
+  fs.mkdirSync(flutterAppDir, { recursive: true });
+}
+app.use('/app', express.static(flutterAppDir));
+app.get(/^\/app/, (req, res) => {
+  res.sendFile(path.join(flutterAppDir, 'index.html'));
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);

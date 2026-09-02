@@ -512,7 +512,7 @@
         <nav>
             <a href="#features">Features</a>
             <a href="privacy_policy.html">Privacy Policy</a>
-            <a href="https://hidely-backend.onrender.com/" class="btn-header" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);"><i class="fa-solid fa-globe"></i> Open Web App</a>
+            <a href="/app/" class="btn-header" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);"><i class="fa-solid fa-globe"></i> Open Web App</a>
             <button onclick="openUnifiedLoginModal()" class="btn-header" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); border: none; cursor: pointer;"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
         </nav>
     </header>
@@ -537,7 +537,7 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a1.5 1.5 0 0 1-2.122-2.122L9.549 12 1.488 3.936a1.5 1.5 0 0 1 2.121-2.122zm16.782 8.064l-4.576-4.576L13.792 7.32l4.576 4.576a1.5 1.5 0 0 0 2.023-2.018z"/></svg>
                 Download Release APK
             </a>
-            <a href="https://hidely-backend.onrender.com/" class="btn-glow" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+            <a href="/app/" class="btn-glow" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
                 <i class="fa-solid fa-globe"></i> Launch Web Platform
             </a>
             <a href="privacy_policy.html" class="btn-glass">Privacy Policy</a>
@@ -759,10 +759,10 @@
 
                 if (data.user && (data.user.is_admin || data.user.email === 'admin@hidely.com')) {
                     // Open Admin Panel!
-                    window.location.href = '/admin';
+                    window.location.href = '/admin/';
                 } else {
                     // Open Instagram-like Hidely Web App!
-                    window.location.href = 'https://hidely-backend.onrender.com/';
+                    window.location.href = '/app/';
                 }
             } catch (err) {
                 btn.disabled = false;
