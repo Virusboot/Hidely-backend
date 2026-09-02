@@ -8,9 +8,10 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 
 // Middleware
 app.use(cors());
@@ -25,6 +26,13 @@ if (!fs.existsSync(uploadsDir)) {
 app.use('/uploads', express.static(uploadsDir));
 app.use('/assets', express.static(path.join(__dirname, '../../assets')));
 
+// Serve Web Admin Dashboard
+const adminPublicDir = path.join(__dirname, '../public/admin');
+if (!fs.existsSync(adminPublicDir)) {
+  fs.mkdirSync(adminPublicDir, { recursive: true });
+}
+app.use('/admin', express.static(adminPublicDir));
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -36,11 +44,17 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
 
-// Root Endpoint
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the Hidely API Backend!' });
-});
+// Serve Official Website Landing Page at Root /
+const websiteDir = path.join(__dirname, '../../web_site');
+if (fs.existsSync(websiteDir)) {
+  app.use(express.static(websiteDir));
+} else {
+  app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to the Hidely API Backend & Admin System!', adminDashboard: '/admin' });
+  });
+}
 
 // Start Server & Test Database Connection
 const startServer = async () => {

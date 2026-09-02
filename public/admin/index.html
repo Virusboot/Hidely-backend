@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hidely Admin Console - Hidden Places Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-container" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="brand-logo">
+          <i class="fa-solid fa-compass"></i>
+        </div>
+        <h2>Hidely Control Console</h2>
+        <p>Admin Portal & System Management</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label><i class="fa-solid fa-envelope"></i> Admin Email / Username</label>
+          <input type="text" id="login-email" value="admin@hidely.com" placeholder="admin@hidely.com" required>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa-solid fa-key"></i> Password</label>
+          <input type="password" id="login-password" value="admin123" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">
+          <i class="fa-solid fa-right-to-bracket"></i> Login to Console
+        </button>
+      </form>
+      <div id="login-error" class="error-badge hidden"></div>
+    </div>
+  </div>
+
+  <!-- MAIN ADMIN DASHBOARD -->
+  <div id="app-container" class="app-layout hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon"><i class="fa-solid fa-location-dot"></i></div>
+        <div class="brand-text">
+          <h1>HIDELY</h1>
+          <span>ADMIN DASHBOARD</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="dashboard">
+          <i class="fa-solid fa-chart-pie"></i> Overview Dashboard
+        </button>
+        <button class="nav-item" data-tab="places">
+          <i class="fa-solid fa-map-location-dot"></i> Hidden Places & Spots
+        </button>
+        <button class="nav-item" data-tab="users">
+          <i class="fa-solid fa-users-gear"></i> Users & Creators
+        </button>
+        <button class="nav-item" data-tab="posts">
+          <i class="fa-solid fa-photo-film"></i> Community Moderation
+        </button>
+        <button class="nav-item" data-tab="broadcast">
+          <i class="fa-solid fa-bullhorn"></i> System Broadcasts
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="admin-profile">
+          <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
+          <div class="admin-info">
+            <span id="admin-name">Admin User</span>
+            <small id="admin-role">Super Admin</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn-icon" title="Logout">
+          <i class="fa-solid fa-power-off"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content View -->
+    <main class="main-content">
+      <!-- Top Header Bar -->
+      <header class="top-bar">
+        <div class="page-title">
+          <h2 id="current-tab-title">Overview Dashboard</h2>
+          <p id="current-tab-sub">Real-time stats and platform health</p>
+        </div>
+        <div class="system-status">
+          <span class="status-indicator online"></span>
+          <span>PostgreSQL Active</span>
+        </div>
+      </header>
+
+      <!-- TAB 1: OVERVIEW DASHBOARD -->
+      <section id="tab-dashboard" class="tab-page active">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon purple"><i class="fa-solid fa-users"></i></div>
+            <div class="stat-info">
+              <h3>Total Users</h3>
+              <div class="stat-value" id="stat-users">0</div>
+              <span class="stat-label">Registered Explorers</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon emerald"><i class="fa-solid fa-map-pin"></i></div>
+            <div class="stat-info">
+              <h3>Hidden Places</h3>
+              <div class="stat-value" id="stat-places">0</div>
+              <span class="stat-label">Curated Spots</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon amber"><i class="fa-solid fa-images"></i></div>
+            <div class="stat-info">
+              <h3>User Posts</h3>
+              <div class="stat-value" id="stat-posts">0</div>
+              <span class="stat-label">Community Uploads</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa-solid fa-heart"></i></div>
+            <div class="stat-info">
+              <h3>Total Engagement</h3>
+              <div class="stat-value" id="stat-likes">0</div>
+              <span class="stat-label">Post Likes & Interactions</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card margin-top">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Community Activity</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Author</th>
+                  <th>Caption / Description</th>
+                  <th>Image</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="recent-activity-body">
+                <tr><td colspan="4" class="text-center">Loading activity...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: HIDDEN PLACES MANAGEMENT -->
+      <section id="tab-places" class="tab-page">
+        <div class="toolbar">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="places-search" placeholder="Search places by name or description...">
+          </div>
+          <button class="btn btn-primary" id="open-add-place-modal">
+            <i class="fa-solid fa-plus"></i> Add New Hidden Place
+          </button>
+        </div>
+
+        <div class="section-card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Place Name</th>
+                  <th>Category</th>
+                  <th>Coordinates (Lat, Lng)</th>
+                  <th>Rating</th>
+                  <th>Featured</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="places-list-body">
+                <tr><td colspan="7" class="text-center">Loading places...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: USERS MANAGEMENT -->
+      <section id="tab-users" class="tab-page">
+        <div class="toolbar">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="users-search" placeholder="Search user by name, username or email...">
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Points</th>
+                  <th>Verified Creator</th>
+                  <th>Admin Privilege</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-list-body">
+                <tr><td colspan="6" class="text-center">Loading users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: POSTS MODERATION -->
+      <section id="tab-posts" class="tab-page">
+        <div class="toolbar">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="posts-search" placeholder="Filter posts by caption or location...">
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Author</th>
+                  <th>Caption</th>
+                  <th>Location</th>
+                  <th>Image</th>
+                  <th>Likes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="posts-list-body">
+                <tr><td colspan="7" class="text-center">Loading posts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: BROADCAST NOTIFICATIONS -->
+      <section id="tab-broadcast" class="tab-page">
+        <div class="section-card max-w-600">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-bullhorn"></i> Send Community Announcement</h3>
+            <p>Broadcast a push notification / field advisory to all registered app users.</p>
+          </div>
+
+          <form id="broadcast-form">
+            <div class="form-group">
+              <label>Notification Type</label>
+              <select id="broadcast-type">
+                <option value="system_announcement">📢 System Announcement</option>
+                <option value="spot_alert">🏞️ New Hidden Spot Alert</option>
+                <option value="field_advisory">⚠️ Field / Weather Advisory</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Announcement Message</label>
+              <textarea id="broadcast-text" rows="4" placeholder="Enter message for app users..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+              <i class="fa-solid fa-paper-plane"></i> Send Broadcast Now
+            </button>
+          </form>
+          <div id="broadcast-status" class="status-box hidden"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ADD / EDIT PLACE MODAL -->
+  <div id="place-modal" class="modal-wrapper hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-place-title">Add New Hidden Spot</h3>
+        <button class="btn-close" id="close-place-modal">&times;</button>
+      </div>
+
+      <form id="place-form">
+        <input type="hidden" id="place-id">
+        <div class="form-group">
+          <label>Spot Name</label>
+          <input type="text" id="place-name" placeholder="e.g. Hidden Valley Falls" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="place-category">
+              <option value="Attraction">Attraction</option>
+              <option value="Waterfall">Waterfall</option>
+              <option value="Cafe">Cafe</option>
+              <option value="Sunset Spot">Sunset Spot</option>
+              <option value="Fort">Fort & Heritage</option>
+              <option value="Nature">Nature & Trek</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Rating (1.0 - 5.0)</label>
+            <input type="number" step="0.1" id="place-rating" value="4.8" min="1" max="5">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Latitude Coordinate</label>
+            <input type="number" step="any" id="place-lat" placeholder="e.g. 28.6139" required>
+          </div>
+
+          <div class="form-group">
+            <label>Longitude Coordinate</label>
+            <input type="number" step="any" id="place-lng" placeholder="e.g. 77.2090" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Description & Advisory Info</label>
+          <textarea id="place-description" rows="3" placeholder="Provide spot highlights and access instructions..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Image URL (or upload)</label>
+          <input type="text" id="place-image-url" placeholder="https://... or upload image">
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="place-featured">
+          <label for="place-featured">Mark as Featured Spot on App Discovery</label>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancel-place-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Spot</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

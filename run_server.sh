@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-WORKSPACE_DIR="/Users/harshbhardwaj/Desktop/Harsh/Apps/Hidely_new"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 TOOLS_DIR="$WORKSPACE_DIR/.local_tools"
 NODE_BIN="$TOOLS_DIR/node/bin"
 PG_BIN="$TOOLS_DIR/postgres/16/bin"
