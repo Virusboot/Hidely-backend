@@ -1,8 +1,6 @@
-// Hidely Web Admin Console Application Script (Live Website Integration)
+// Hidely Web Admin Console Application Script
 
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? (window.location.port ? `${window.location.protocol}//${window.location.hostname}:${window.location.port}` : 'http://localhost:5050')
-  : 'https://hidely-backend.onrender.com';
+const API_BASE_URL = window.location.origin;
 
 let token = localStorage.getItem('hidely_admin_token') || '';
 let currentAdmin = JSON.parse(localStorage.getItem('hidely_admin_user') || 'null');
@@ -204,7 +202,7 @@ async function loadStats() {
       <tr>
         <td><strong>${escapeHtml(p.author_name || p.author_username)}</strong></td>
         <td>${escapeHtml(p.caption || 'No caption')}</td>
-        <td><img src="${getMediaUrl(p.image_url)}" class="img-thumb" alt="Post"></td>
+        <td><img src="${getMediaUrl(p.image_url)}" class="img-thumb" alt="" onerror="this.onerror=null; this.src='/assets/images/app_icon.png';"></td>
         <td>${new Date(p.created_at).toLocaleDateString()}</td>
       </tr>
     `).join('');
@@ -375,7 +373,7 @@ async function loadPosts() {
         <td><strong>${escapeHtml(p.author_name || p.author_username)}</strong></td>
         <td>${escapeHtml(p.caption || 'No caption')}</td>
         <td>${escapeHtml(p.location || 'Unknown')}</td>
-        <td><img src="${getMediaUrl(p.image_url)}" class="img-thumb" alt="Post"></td>
+        <td><img src="${getMediaUrl(p.image_url)}" class="img-thumb" alt="" onerror="this.onerror=null; this.src='/assets/images/app_icon.png';"></td>
         <td>❤️ ${p.likes_count || 0}</td>
         <td>
           <button class="btn btn-sm btn-danger" onclick="deletePost(${p.id})"><i class="fa-solid fa-trash"></i> Remove</button>
@@ -433,8 +431,10 @@ function closePlaceModal() {
 
 // Utilities
 function getMediaUrl(url) {
-  if (!url) return 'https://via.placeholder.com/60';
+  if (!url) return '/assets/images/app_icon.png';
   if (url.startsWith('http')) return url;
+  if (url.startsWith('/')) return url;
+  if (url.startsWith('assets/')) return `/${url}`;
   return `${API_BASE_URL}/${url}`;
 }
 
