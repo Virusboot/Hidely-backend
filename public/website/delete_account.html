@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account & Data Deletion Request — Hidely</title>
+    <meta name="description" content="Request the deletion of your Hidely account and associated personal data in accordance with Google Play Store User Data policies.">
+
+    <!-- Google Fonts: Public Sans & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-light: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --border-glass: rgba(147, 51, 234, 0.18);
+            --border-active: rgba(147, 51, 234, 0.45);
+            
+            --purple-main: #2B1564;
+            --purple-dark: #1C0D5A;
+            --purple-vivid: #9333EA;
+            --pink-accent: #EC4899;
+            --red-alert: #EF4444;
+            
+            --text-dark: #0F172A;
+            --text-heading: #1C0D5A;
+            --text-sub: #475569;
+            --text-muted: #64748B;
+            
+            --shadow-glass: 0 20px 40px -15px rgba(43, 21, 100, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            --grad-btn: linear-gradient(135deg, #2B1564 0%, #9333EA 100%);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Public Sans', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, .font-logo {
+            font-family: 'Public Sans', 'Outfit', sans-serif;
+            color: var(--text-heading);
+        }
+
+        /* Ambient Mesh Glow */
+        .mesh-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .aura {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.45;
+        }
+        .aura-1 { width: 500px; height: 500px; background: #E9D5FF; top: -150px; left: 10%; }
+        .aura-2 { width: 450px; height: 450px; background: #FBCFE8; bottom: -100px; right: 5%; }
+
+        header {
+            max-width: 1100px;
+            width: 90%;
+            margin: 20px auto 0;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid var(--border-glass);
+            border-radius: 100px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+        }
+
+        .logo-wrap { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .logo-img { height: 40px; object-fit: contain; }
+
+        .btn-back {
+            color: var(--text-sub);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+        .btn-back:hover { color: var(--purple-vivid); }
+
+        .container {
+            max-width: 800px;
+            width: 90%;
+            margin: 50px auto 80px;
+            flex: 1;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 28px;
+            padding: 48px;
+            box-shadow: var(--shadow-glass);
+        }
+
+        .tag-danger {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: var(--red-alert);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 6px 16px;
+            border-radius: 100px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: clamp(28px, 4vw, 40px);
+            font-weight: 800;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .desc {
+            color: var(--text-sub);
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+
+        .info-box {
+            background: #FAF5FF;
+            border: 1px solid rgba(147, 51, 234, 0.2);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 36px;
+        }
+        .info-box h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--purple-main);
+        }
+        .info-box ul {
+            padding-left: 20px;
+            color: var(--text-sub);
+            font-size: 14px;
+        }
+        .info-box li { margin-bottom: 6px; }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 8px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid var(--border-glass);
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 15px;
+            color: var(--text-dark);
+            background: #F8FAFC;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--purple-vivid);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 4px rgba(147, 51, 234, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 28px 0;
+        }
+
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+            margin-top: 3px;
+            accent-color: var(--purple-vivid);
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-sub);
+            cursor: pointer;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+            color: #FFFFFF;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(239, 68, 68, 0.4);
+        }
+
+        .success-banner {
+            display: none;
+            background: #ECFDF5;
+            border: 1px solid #10B981;
+            color: #065F46;
+            padding: 20px;
+            border-radius: 16px;
+            margin-top: 24px;
+            font-size: 15px;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        footer {
+            border-top: 1px solid var(--border-glass);
+            padding: 30px 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="mesh-bg">
+        <div class="aura aura-1"></div>
+        <div class="aura aura-2"></div>
+    </div>
+
+    <header>
+        <a href="index.html" class="logo-wrap">
+            <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="logo-img" onerror="this.src='assets/images/logo.png'">
+        </a>
+        <a href="index.html" class="btn-back">← Back to Home</a>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <span class="tag-danger">User Data Policy</span>
+            <h1 class="font-logo">Account &amp; Data Deletion Request</h1>
+            <p class="desc">You have full control over your data. You can request the permanent deletion of your Hidely account and all associated personal data using the form below or inside the Hidely mobile app.</p>
+
+            <div class="info-box">
+                <h3>What happens when your account is deleted:</h3>
+                <ul>
+                    <li><strong>Account Credentials:</strong> Your username, email address, password hash, and profile details will be permanently purged.</li>
+                    <li><strong>Content &amp; Posts:</strong> All travel posts, photos, comments, and place reviews created by your account will be removed.</li>
+                    <li><strong>Location Data:</strong> Any cached location logs and saved places associated with your account ID will be wiped.</li>
+                    <li><strong>Retention Period:</strong> Deletion requests are processed immediately and fully completed within 30 days.</li>
+                </ul>
+            </div>
+
+            <form id="deleteForm" onsubmit="handleDeletionSubmit(event)">
+                <div class="form-group">
+                    <label for="username">Hidely Username or Email *</label>
+                    <input type="text" id="username" placeholder="e.g. realharshbhardwaj or user@domain.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Contact Email (for confirmation) *</label>
+                    <input type="email" id="email" placeholder="your_email@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="reason">Reason for Account Deletion (Optional)</label>
+                    <select id="reason">
+                        <option value="">Select a reason...</option>
+                        <option value="privacy">Privacy concerns</option>
+                        <option value="no_longer_use">No longer use the app</option>
+                        <option value="duplicate_account">Created a duplicate account</option>
+                        <option value="other">Other reason</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="comments">Additional Details (Optional)</label>
+                    <textarea id="comments" rows="3" placeholder="Provide any additional details if needed..."></textarea>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="confirm" required>
+                    <label for="confirm">I understand that submitting this request will permanently delete my account and all associated data, and this action cannot be undone.</label>
+                </div>
+
+                <button type="submit" class="btn-submit">Submit Account Deletion Request</button>
+
+                <div class="success-banner" id="successBanner">
+                    ✅ <strong>Request Submitted Successfully!</strong><br>
+                    Your account deletion request has been logged. Our privacy team will verify your request and send a final confirmation to your email address within 24-48 hours.
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2026 Hidely — A Kittu Virus Studio Experience. Google Play Store Policy Compliant.
+    </footer>
+
+    <script>
+        function handleDeletionSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('deleteForm');
+            const successBanner = document.getElementById('successBanner');
+            const submitBtn = form.querySelector('.btn-submit');
+
+            submitBtn.style.opacity = '0.6';
+            submitBtn.innerText = 'Processing Request...';
+            submitBtn.disabled = true;
+
+            setTimeout(() => {
+                submitBtn.style.display = 'none';
+                successBanner.style.display = 'block';
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

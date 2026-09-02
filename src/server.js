@@ -58,9 +58,19 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Serve Official Website Landing Page at Root /
-const websiteDir = path.join(__dirname, '../../web_site');
+const websiteDir = path.join(__dirname, '../public/website');
+const altWebsiteDir = path.join(__dirname, '../../web_site');
+
 if (fs.existsSync(websiteDir)) {
   app.use(express.static(websiteDir));
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(websiteDir, 'index.html'));
+  });
+} else if (fs.existsSync(altWebsiteDir)) {
+  app.use(express.static(altWebsiteDir));
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(altWebsiteDir, 'index.html'));
+  });
 } else {
   app.get('/', (req, res) => {
     res.json({ message: 'Welcome to the Hidely API Backend & Admin System!', adminDashboard: '/admin' });
