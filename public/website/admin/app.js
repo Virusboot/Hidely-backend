@@ -27,11 +27,30 @@ function setupEventListeners() {
   // Logout button
   document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
 
-  // Tab switching
+  // Mobile sidebar drawer toggle
+  const mobileToggle = document.getElementById('mobile-sidebar-toggle');
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+  const sidebar = document.querySelector('.sidebar');
+
+  mobileToggle?.addEventListener('click', () => {
+    sidebar?.classList.toggle('open');
+    sidebarOverlay?.classList.toggle('open');
+  });
+
+  sidebarOverlay?.addEventListener('click', () => {
+    sidebar?.classList.remove('open');
+    sidebarOverlay?.classList.remove('open');
+  });
+
+  // Tab switching & close mobile drawer on select
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const targetTab = e.currentTarget.getAttribute('data-tab');
       switchTab(targetTab);
+      if (window.innerWidth <= 960) {
+        sidebar?.classList.remove('open');
+        sidebarOverlay?.classList.remove('open');
+      }
     });
   });
 

@@ -46,11 +46,19 @@
 
   <!-- MAIN ADMIN DASHBOARD -->
   <div id="app-container" class="app-layout hidden">
+    <!-- Mobile Top Header Bar -->
+    <div class="mobile-header">
+      <button id="mobile-sidebar-toggle" class="mobile-toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <img src="../assets/images/logo_horizontal_color.png" alt="HIDELY" class="mobile-brand-logo" onerror="this.src='/assets/images/logo_horizontal_color.png'">
+    </div>
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-brand">
         <img src="../assets/images/logo_horizontal_color.png" alt="HIDELY" class="admin-sidebar-logo" onerror="this.src='/assets/images/logo_horizontal_color.png'">
-        <span class="admin-pill-badge">ADMIN</span>
       </div>
 
       <nav class="nav-menu">
