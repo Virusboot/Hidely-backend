@@ -32,7 +32,7 @@ if (!fs.existsSync(adminPublicDir)) {
   fs.mkdirSync(adminPublicDir, { recursive: true });
 }
 app.use('/admin', express.static(adminPublicDir));
-app.get(['/admin', '/admin/*'], (req, res) => {
+app.get(/^\/admin/, (req, res) => {
   res.sendFile(path.join(adminPublicDir, 'index.html'));
 });
 
@@ -70,14 +70,14 @@ const startServer = async () => {
     // Ensure user ID 1 is mapped to hidely_official
     try {
       await db.query(`
-        INSERT INTO users (id, name, email, password, username, points, is_verified)
-        VALUES (1, 'Hidely Official', 'admin@hidely.com', '$2b$10$UnPK41UWhV/42uLshGepx.a3v0Jj.zOQW/vXz3W.H/fDqI4Vp.KzS', 'hidely_official', 12800, true)
-        ON CONFLICT (id) DO UPDATE 
-        SET username = 'hidely_official', name = 'Hidely Official', email = 'admin@hidely.com';
+        INSERT INTO users (name, email, password_hash, username, points, is_verified)
+        VALUES ('Hidely Official', 'admin@hidely.com', '$2b$10$UnPK41UWhV/42uLshGepx.a3v0Jj.zOQW/vXz3W.H/fDqI4Vp.KzS', 'hidely_official', 12800, true)
+        ON CONFLICT (email) DO UPDATE 
+        SET is_admin = true, is_verified = true;
       `);
       console.log('Admin user mappings updated to hidely_official successfully.');
     } catch (dbErr) {
-      console.error('Error updating admin user mappings:', dbErr);
+      console.error('Error updating admin user mappings:', dbErr.message);
     }
 
     app.listen(PORT, '0.0.0.0', () => {
