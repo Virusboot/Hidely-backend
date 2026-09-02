@@ -22,17 +22,16 @@
             --purple-vivid: #7C3AED;
             --text-dark: #0F172A;
             --text-muted: #64748B;
-            --grad-brand: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #A7F3D0 100%);
+            --grad-brand: linear-gradient(135deg, #1C0D5A 0%, #2B1564 40%, #7C3AED 100%);
             --grad-btn: linear-gradient(135deg, #2B1564 0%, #7C3AED 100%);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Public Sans', 'Outfit', sans-serif; }
 
         body {
-            /* Creative High-Resolution Travel Background Image (Non-Video) */
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.72) 0%, rgba(28, 13, 90, 0.85) 100%),
-                        url('https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1920&q=80') center center / cover no-repeat fixed;
-            color: #FFFFFF;
+            /* Clean App-Matched Sky Blue & White Gradient Background (Background Image Removed) */
+            background: linear-gradient(180deg, #E0F2FE 0%, #F6F9FC 40%, #FFFFFF 100%);
+            color: var(--text-dark);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -41,92 +40,105 @@
             position: relative;
         }
 
+        /* Ambient Light Background Blur */
+        .mesh-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .aura {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(140px);
+            opacity: 0.6;
+        }
+        .aura-1 { width: 650px; height: 650px; background: #E0F2FE; top: -150px; left: 5%; }
+        .aura-2 { width: 550px; height: 550px; background: #DDD6FE; top: 250px; right: -100px; }
+
         /* Modern Glassy Header */
         header {
-            max-width: 1200px;
-            width: 90%;
+            max-width: 1320px;
+            width: 92%;
             margin: 20px auto 0;
-            padding: 14px 28px;
+            padding: 16px 36px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.88);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(124, 58, 237, 0.15);
             border-radius: 100px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
             position: sticky;
             top: 15px;
             z-index: 100;
         }
-        .logo-img { height: 38px; object-fit: contain; filter: brightness(0) invert(1); }
+        .logo-img { height: 42px; object-fit: contain; }
 
-        nav { display: flex; gap: 24px; align-items: center; }
+        nav { display: flex; gap: 28px; align-items: center; }
         nav a {
-            color: rgba(255, 255, 255, 0.85);
+            color: var(--text-muted);
             text-decoration: none;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 600;
             transition: color 0.2s;
         }
-        nav a:hover { color: #FFFFFF; }
+        nav a:hover { color: var(--purple-vivid); }
 
         .btn-header-app {
             background: linear-gradient(135deg, #10B981 0%, #059669 100%);
             color: #FFFFFF !important;
-            padding: 9px 20px;
+            padding: 10px 24px;
             border-radius: 40px;
             font-weight: 700;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
             transition: all 0.2s;
         }
         .btn-header-admin {
-            background: rgba(255, 255, 255, 0.2);
+            background: var(--grad-btn);
             color: #FFFFFF !important;
-            padding: 9px 20px;
+            padding: 10px 24px;
             border-radius: 40px;
             font-weight: 700;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 6px 20px rgba(43, 21, 100, 0.25);
             transition: all 0.2s;
         }
-        .btn-header-admin:hover {
-            background: rgba(255, 255, 255, 0.35);
-        }
 
-        /* Main Split 2-Column Container */
+        /* Wider Main Split 2-Column Container (Expanded Width) */
         .insta-container {
-            max-width: 1100px;
+            max-width: 1320px;
             width: 100%;
-            margin: 30px auto 20px;
-            padding: 20px;
+            margin: 40px auto 30px;
+            padding: 0 32px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 50px;
+            justify-content: space-between;
+            gap: 60px;
             flex: 1;
         }
 
-        /* Left Column Showcase */
+        /* Wider Left Column Showcase */
         .left-showcase {
-            flex: 1;
-            max-width: 520px;
+            flex: 1.4;
+            max-width: 720px;
         }
         .travel-pill {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 6px 18px;
+            background: rgba(124, 58, 237, 0.08);
+            border: 1px solid rgba(124, 58, 237, 0.25);
+            padding: 8px 22px;
             border-radius: 100px;
-            color: #A7F3D0;
-            font-size: 12px;
+            color: var(--purple-vivid);
+            font-size: 13px;
             font-weight: 700;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             text-transform: uppercase;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
+            margin-bottom: 24px;
         }
         .green-dot {
             width: 8px; height: 8px;
@@ -136,13 +148,12 @@
         }
 
         .hero-heading {
-            font-size: clamp(34px, 4.2vw, 52px);
+            font-size: clamp(44px, 5.5vw, 72px);
             font-weight: 800;
-            line-height: 1.12;
-            letter-spacing: -1.2px;
-            color: #FFFFFF;
-            margin-bottom: 20px;
-            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            line-height: 1.08;
+            letter-spacing: -1.8px;
+            color: var(--purple-dark);
+            margin-bottom: 24px;
         }
         .gradient-span {
             background: var(--grad-brand);
@@ -150,129 +161,111 @@
             -webkit-text-fill-color: transparent;
         }
         .hero-sub {
-            font-size: 16px;
-            color: rgba(255, 255, 255, 0.82);
-            line-height: 1.6;
-            margin-bottom: 28px;
+            font-size: 19px;
+            color: var(--text-muted);
+            line-height: 1.65;
+            margin-bottom: 36px;
+            max-width: 640px;
+            font-weight: 500;
         }
 
-        /* Creative Travel Feature Showcase Box */
-        .travel-card-showcase {
-            position: relative;
-            width: 100%;
-            height: 340px;
-            border-radius: 24px;
-            overflow: hidden;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .travel-bg-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.6s ease;
-        }
-        .travel-card-showcase:hover .travel-bg-img {
-            transform: scale(1.05);
-        }
-        .travel-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.1) 0%, rgba(15, 23, 42, 0.9) 100%);
+        /* Feature Highlights Badges (Replaces Image) */
+        .feature-bullets {
             display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 24px;
-            color: #FFFFFF;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 10px;
         }
-        .travel-badge {
-            align-self: flex-start;
-            background: rgba(255, 255, 255, 0.25);
-            backdrop-filter: blur(10px);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+        .feature-item {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(124, 58, 237, 0.15);
+            padding: 16px 24px;
+            border-radius: 18px;
+            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex: 1;
+            min-width: 200px;
+        }
+        .feature-item i {
+            font-size: 24px;
+            color: var(--purple-vivid);
+        }
+        .feature-item-title {
+            font-size: 14px;
             font-weight: 700;
-            margin-bottom: 6px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            color: var(--purple-dark);
         }
-        .travel-title {
-            font-size: 22px;
-            font-weight: 800;
-            margin-bottom: 4px;
-        }
-        .travel-location {
-            font-size: 13px;
-            opacity: 0.9;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .feature-item-desc {
+            font-size: 12px;
+            color: var(--text-muted);
         }
 
-        /* Right Column Glassmorphic Login Stack */
+        /* Right Column Stack */
         .right-column {
-            width: 100%;
-            max-width: 350px;
+            flex: 1;
+            max-width: 380px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 14px;
         }
 
         .right-auth-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 20px;
-            padding: 30px 26px 22px;
+            border: 1px solid rgba(124, 58, 237, 0.15);
+            border-radius: 24px;
+            padding: 36px 32px 28px;
             text-align: center;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 20px 50px -10px rgba(43, 21, 100, 0.1);
             color: var(--text-dark);
         }
 
         .auth-brand img {
-            height: 42px;
+            height: 44px;
             object-fit: contain;
-            margin-bottom: 18px;
+            margin-bottom: 22px;
         }
 
         .input-group {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .input-group input {
             width: 100%;
-            height: 42px;
-            padding: 0 14px;
+            height: 46px;
+            padding: 0 16px;
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            font-size: 13px;
+            border-radius: 12px;
+            font-size: 14px;
             color: var(--text-dark);
             outline: none;
+            transition: all 0.2s;
         }
         .input-group input:focus {
             border-color: var(--purple-vivid);
             background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
         }
 
         .btn-login {
             width: 100%;
-            height: 42px;
+            height: 46px;
             background: var(--grad-btn);
             color: #FFFFFF;
             border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 12px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            margin-top: 8px;
+            margin-top: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            box-shadow: 0 8px 20px rgba(43, 21, 100, 0.3);
+            box-shadow: 0 8px 20px rgba(43, 21, 100, 0.25);
             transition: all 0.2s;
         }
         .btn-login:hover { transform: translateY(-1px); }
@@ -280,7 +273,7 @@
         .divider {
             display: flex;
             align-items: center;
-            margin: 16px 0;
+            margin: 20px 0;
             color: #94A3B8;
             font-size: 12px;
             font-weight: 700;
@@ -291,16 +284,16 @@
             height: 1px;
             background: #E2E8F0;
         }
-        .divider span { padding: 0 12px; }
+        .divider span { padding: 0 14px; }
 
         .btn-explore-guest {
             width: 100%;
-            height: 40px;
+            height: 44px;
             background: linear-gradient(135deg, #10B981 0%, #059669 100%);
             color: #FFFFFF;
             border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 12px;
+            font-size: 14.5px;
             font-weight: 700;
             text-decoration: none;
             display: inline-flex;
@@ -313,15 +306,14 @@
         .btn-explore-guest:hover { transform: translateY(-1px); }
 
         .signup-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 14px;
-            padding: 14px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 16px;
             text-align: center;
-            font-size: 13.5px;
+            font-size: 14px;
             color: var(--text-dark);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
         }
         .signup-card a {
             color: var(--purple-vivid);
@@ -335,33 +327,32 @@
             margin-top: 4px;
         }
         .get-app-container p {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 8px;
+            font-size: 13.5px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
             font-weight: 600;
         }
         .store-badges {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: center;
         }
         .store-badge-btn {
-            background: #000000;
+            background: #0F172A;
             color: #FFFFFF;
-            padding: 7px 12px;
-            border-radius: 8px;
+            padding: 8px 16px;
+            border-radius: 12px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            gap: 10px;
             transition: transform 0.2s;
         }
         .store-badge-btn:hover { transform: translateY(-1px); }
-        .store-badge-btn i { font-size: 20px; }
+        .store-badge-btn i { font-size: 22px; }
         .store-badge-text { text-align: left; line-height: 1.2; }
         .store-badge-text .small { font-size: 8px; text-transform: uppercase; opacity: 0.8; display: block; }
-        .store-badge-text .title { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        .store-badge-text .title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
         
         .badge-coming-soon {
             background: #7C3AED;
@@ -374,11 +365,11 @@
         }
 
         .error-badge {
-            margin-top: 8px;
-            padding: 8px;
+            margin-top: 10px;
+            padding: 10px;
             background: #FEF2F2;
             border: 1px solid #FCA5A5;
-            border-radius: 6px;
+            border-radius: 8px;
             color: #991B1B;
             font-size: 12px;
             font-weight: 600;
@@ -387,41 +378,46 @@
 
         /* Clean One-Line Instagram Style Footer */
         footer {
-            max-width: 1100px;
+            max-width: 1320px;
             width: 100%;
-            margin: 30px auto 20px;
-            padding: 16px 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            margin: 40px auto 24px;
+            padding: 18px 32px;
+            border-top: 1px solid #E2E8F0;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.75);
+            font-size: 13px;
+            color: var(--text-muted);
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
         }
         .footer-one-line-links {
             display: flex;
-            gap: 16px;
+            gap: 20px;
             align-items: center;
             flex-wrap: wrap;
         }
         .footer-one-line-links a {
-            color: rgba(255, 255, 255, 0.85);
+            color: var(--text-muted);
             text-decoration: none;
             transition: color 0.2s;
         }
-        .footer-one-line-links a:hover { color: #FFFFFF; text-decoration: underline; }
+        .footer-one-line-links a:hover { color: var(--purple-vivid); text-decoration: underline; }
 
-        @media (max-width: 800px) {
-            .insta-container { flex-direction: column; gap: 30px; }
+        @media (max-width: 960px) {
+            .insta-container { flex-direction: column; gap: 40px; }
             .left-showcase { text-align: center; max-width: 100%; }
-            .travel-card-showcase { height: 260px; }
+            .feature-bullets { justify-content: center; }
             footer { flex-direction: column; text-align: center; }
         }
     </style>
 </head>
 <body>
+
+    <div class="mesh-bg">
+        <div class="aura aura-1"></div>
+        <div class="aura aura-2"></div>
+    </div>
 
     <!-- Modern Glassy Sticky Header -->
     <header>
@@ -436,10 +432,10 @@
         </nav>
     </header>
 
-    <!-- Main Container -->
+    <!-- Main Container (Expanded 1320px Width) -->
     <div class="insta-container">
 
-        <!-- Left Column: Creative Travel Feature Showcase -->
+        <!-- Left Column: Spacious Headline & Travel Features -->
         <div class="left-showcase">
             <div class="travel-pill">
                 <span class="green-dot"></span> DISCOVER THE UNEXPLORED
@@ -452,16 +448,20 @@
                 The world’s first location-contextual social platform for secret stays, offline compass navigation, and sharing travel stories.
             </p>
 
-            <!-- Creative High-Quality Travel Background Card -->
-            <div class="travel-card-showcase">
-                <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80" alt="Hidden Travel Spot" class="travel-bg-img">
-                <div class="travel-overlay">
-                    <div class="travel-badge">
-                        <i class="fa-solid fa-water"></i> Secret Waterfalls
+            <!-- Feature Highlight Cards (Images Removed) -->
+            <div class="feature-bullets">
+                <div class="feature-item">
+                    <i class="fa-solid fa-water"></i>
+                    <div>
+                        <div class="feature-item-title">Secret Spots</div>
+                        <div class="feature-item-desc">Waterfalls, treks & view points</div>
                     </div>
-                    <div class="travel-title">Tiger Hills Hidden Waterfalls</div>
-                    <div class="travel-location">
-                        <i class="fa-solid fa-location-dot"></i> Nainital, Uttarakhand • 1,280 Explorers Visited
+                </div>
+                <div class="feature-item">
+                    <i class="fa-solid fa-compass"></i>
+                    <div>
+                        <div class="feature-item-title">Offline GPS</div>
+                        <div class="feature-item-desc">Turn-by-turn navigation</div>
                     </div>
                 </div>
             </div>
