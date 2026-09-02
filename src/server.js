@@ -67,19 +67,19 @@ app.use('/api/posts', postRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Serve Official Website Landing Page at Root /
+// Serve Unified Hidely Web Platform at Root /
 const websiteDir = path.join(__dirname, '../public/website');
 const altWebsiteDir = path.join(__dirname, '../../web_site');
 
-if (fs.existsSync(websiteDir)) {
-  app.use(express.static(websiteDir));
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(websiteDir, 'index.html'));
-  });
-} else if (fs.existsSync(altWebsiteDir)) {
-  app.use(express.static(altWebsiteDir));
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(altWebsiteDir, 'index.html'));
+const activeWebDir = fs.existsSync(websiteDir) ? websiteDir : fs.existsSync(altWebsiteDir) ? altWebsiteDir : null;
+
+if (activeWebDir) {
+  app.use(express.static(activeWebDir));
+  app.get('*', (req, res, next) => {
+    if (req.url.startsWith('/api') || req.url.startsWith('/admin') || req.url.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(activeWebDir, 'index.html'));
   });
 } else {
   app.get('/', (req, res) => {
