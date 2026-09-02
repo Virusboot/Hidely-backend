@@ -66,11 +66,20 @@ async function handleLogin(e) {
   submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to Console...';
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
+    let res = await fetch(`${API_BASE_URL}/api/admin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
+
+    if (res.status === 404) {
+      // Fallback to primary auth login endpoint
+      res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+    }
 
     const data = await res.json();
     submitBtn.disabled = false;
@@ -82,8 +91,9 @@ async function handleLogin(e) {
       return;
     }
 
+    const adminObj = data.admin || data.user || { name: 'Admin User', email: email };
     token = data.token;
-    currentAdmin = data.admin;
+    currentAdmin = adminObj;
     localStorage.setItem('hidely_admin_token', token);
     localStorage.setItem('hidely_admin_user', JSON.stringify(currentAdmin));
 
