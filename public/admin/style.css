@@ -54,13 +54,13 @@ body {
 
 .auth-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .auth-brand-logo {
-  height: 44px;
+  height: 46px;
   object-fit: contain;
-  margin: 0 auto 12px;
+  margin: 0 auto;
   display: block;
 }
 
