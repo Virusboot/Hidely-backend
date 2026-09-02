@@ -375,12 +375,118 @@
         }
         .footer-links-row a:hover { color: var(--purple-vivid); }
 
+        /* ===== TABLET (≤960px) ===== */
         @media (max-width: 960px) {
-            .hero-container { flex-direction: column; gap: 40px; text-align: center; }
+            header { padding: 12px 24px; }
+            nav { gap: 20px; }
+            nav a:not(.btn-header-cta) { display: none; }
+            .hero-container { flex-direction: column; gap: 32px; text-align: center; padding: 0 24px; margin: 32px auto 28px; }
             .hero-left { max-width: 100%; }
-            .hero-description { margin-left: auto; margin-right: auto; }
+            .right-auth-column { max-width: 440px; width: 100%; margin: 0 auto; }
+            .hero-description { margin-left: auto; margin-right: auto; font-size: 16px; }
             .hero-store-buttons { justify-content: center; }
-            footer { flex-direction: column; text-align: center; }
+            footer { flex-direction: column; text-align: center; gap: 12px; padding: 16px 24px 0; }
+            .footer-links-row { flex-wrap: wrap; justify-content: center; gap: 14px; }
+        }
+
+        /* ===== PHONE (≤600px) ===== */
+        @media (max-width: 600px) {
+            header {
+                width: 94%;
+                padding: 10px 18px;
+                top: 10px;
+                border-radius: 60px;
+                margin: 12px auto 0;
+            }
+            .logo-img { height: 32px; }
+            nav { gap: 10px; }
+            nav a:not(.btn-header-cta) { display: none; }
+            .btn-header-cta {
+                padding: 8px 14px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+            .btn-header-cta i { display: none; }
+
+            .hero-container {
+                padding: 0 16px;
+                margin: 20px auto 20px;
+                gap: 24px;
+            }
+
+            .badge-pill { font-size: 10.5px; padding: 6px 14px; }
+
+            .hero-title {
+                font-size: clamp(32px, 9vw, 46px);
+                letter-spacing: -0.8px;
+                margin-bottom: 16px;
+            }
+
+            .hero-description {
+                font-size: 15px;
+                line-height: 1.6;
+                margin-bottom: 24px;
+            }
+
+            .hero-store-buttons {
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+            }
+            .hero-store-btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+                padding: 12px 20px;
+                border-radius: 14px;
+            }
+
+            .right-auth-column {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .auth-light-card {
+                padding: 28px 20px 22px;
+                border-radius: 20px;
+            }
+
+            .auth-brand-logo { height: 36px; margin-bottom: 18px; }
+
+            .input-box input {
+                height: 48px;
+                font-size: 15px;
+                border-radius: 10px;
+            }
+
+            .btn-submit-login {
+                height: 48px;
+                font-size: 15px;
+                border-radius: 10px;
+            }
+
+            .btn-guest-explore {
+                height: 46px;
+                font-size: 14px;
+                border-radius: 10px;
+            }
+
+            footer {
+                margin: 28px auto 16px;
+                padding: 14px 16px 0;
+                font-size: 12px;
+            }
+            .footer-links-row { gap: 12px; font-size: 12px; }
+
+            .aura-1 { width: 320px; height: 320px; }
+            .aura-2 { width: 280px; height: 280px; }
+        }
+
+        /* ===== VERY SMALL PHONE (≤380px) ===== */
+        @media (max-width: 380px) {
+            .hero-title { font-size: 30px; }
+            .btn-header-cta { padding: 7px 10px; font-size: 11px; }
+            .auth-light-card { padding: 22px 14px 18px; }
         }
     </style>
 </head>
