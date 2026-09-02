@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hidely — Discover Places, Offline Maps & HD Calls</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="description" content="Hidely is the premier location-contextual social platform for discovering nearby stays, navigating offline, and making crystal-clear HD voice & video calls.">
+    <title>Hidely — Explore Places & Connect Seamlessly</title>
+    <meta name="description" content="Hidely is the premier social platform for discovering hidden places, offline navigation, and connecting with travel squad.">
 
     <!-- Google Fonts: Public Sans & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,50 +18,32 @@
     <style>
         :root {
             --bg-light: #F6F9FC;
-            --bg-glass-card: rgba(255, 255, 255, 0.85);
-            --bg-glass-nav: rgba(255, 255, 255, 0.90);
-            --border-glass: rgba(124, 58, 237, 0.18);
-            --border-active: rgba(124, 58, 237, 0.45);
-            
             --purple-main: #2B1564;
             --purple-dark: #1C0D5A;
             --purple-vivid: #7C3AED;
-            --pink-accent: #EC4899;
-            --cyan-accent: #0284C7;
-            --green-accent: #10B981;
-            
             --text-dark: #0F172A;
-            --text-heading: #1C0D5A;
-            --text-sub: #475569;
             --text-muted: #64748B;
-            
-            --shadow-glass: 0 20px 40px -15px rgba(43, 21, 100, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-            --shadow-float: 0 25px 60px -15px rgba(124, 58, 237, 0.22);
-            
             --grad-brand: linear-gradient(135deg, #1C0D5A 0%, #2B1564 40%, #7C3AED 100%);
             --grad-btn: linear-gradient(135deg, #2B1564 0%, #7C3AED 100%);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; scroll-behavior: smooth; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Public Sans', 'Outfit', sans-serif; }
 
         body {
-            font-family: 'Public Sans', sans-serif;
             background-color: var(--bg-light);
             color: var(--text-dark);
-            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
             overflow-x: hidden;
             position: relative;
         }
 
-        h1, h2, h3, h4, .font-logo {
-            font-family: 'Public Sans', 'Outfit', sans-serif;
-            color: var(--text-heading);
-        }
-
-        /* Ambient Pastel Aura Background - Matched with App Theme Gradient */
+        /* Ambient Background */
         .mesh-bg {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            inset: 0;
             z-index: -2;
             overflow: hidden;
             pointer-events: none;
@@ -69,120 +51,55 @@
         .aura {
             position: absolute;
             border-radius: 50%;
-            filter: blur(130px);
+            filter: blur(140px);
             opacity: 0.65;
             animation: floatAura 18s ease-in-out infinite alternate;
         }
-        .aura-1 { width: 650px; height: 650px; background: #E0F2FE; top: -200px; left: 10%; }
-        .aura-2 { width: 550px; height: 550px; background: #DDD6FE; top: 250px; right: -150px; animation-delay: -6s; }
-        .aura-3 { width: 500px; height: 500px; background: #F3E8FF; bottom: -150px; left: -100px; animation-delay: -12s; }
+        .aura-1 { width: 650px; height: 650px; background: #E0F2FE; top: -150px; left: 5%; }
+        .aura-2 { width: 550px; height: 550px; background: #DDD6FE; top: 250px; right: -100px; }
+        .aura-3 { width: 500px; height: 500px; background: #F3E8FF; bottom: -150px; left: 10%; }
 
         @keyframes floatAura {
             0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(50px, 30px) scale(1.05); }
-            100% { transform: translate(-30px, 50px) scale(0.98); }
+            100% { transform: translate(30px, 40px) scale(1.05); }
         }
 
-        .grid-overlay {
-            position: absolute;
-            inset: 0;
-            background-image: radial-gradient(rgba(147, 51, 234, 0.08) 1px, transparent 1px);
-            background-size: 36px 36px;
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        /* Glassmorphic Navigation Header */
+        /* Top Header */
         header {
             max-width: 1240px;
-            margin: 20px auto 0;
-            padding: 16px 32px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            position: sticky;
-            top: 20px;
-            z-index: 100;
-            background: var(--bg-glass-nav);
-            border: 1px solid var(--border-glass);
-            border-radius: 100px;
-            backdrop-filter: blur(24px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
         }
+        .logo-img { height: 42px; object-fit: contain; }
 
-        .logo-wrap {
+        /* Main Split 2-Column Container (Instagram Web Style) */
+        .insta-container {
+            max-width: 1140px;
+            width: 100%;
+            margin: 10px auto;
+            padding: 20px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            text-decoration: none;
+            justify-content: center;
+            gap: 60px;
+            flex: 1;
         }
 
-        .logo-img {
-            height: 42px;
-            object-fit: contain;
+        /* Left Showcase Column */
+        .left-showcase {
+            flex: 1;
+            max-width: 540px;
         }
-
-        nav { display: flex; gap: 32px; align-items: center; }
-        nav a {
-            color: var(--text-sub);
-            text-decoration: none;
-            font-size: 15px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        nav a:hover { color: var(--purple-vivid); }
-
-        .btn-header {
-            background: var(--grad-btn);
-            color: #FFF !important;
-            padding: 10px 24px;
-            border-radius: 40px;
-            font-weight: 700;
-            box-shadow: 0 6px 20px rgba(43, 21, 100, 0.25);
-            transition: all 0.3s ease;
-        }
-        .btn-header:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(147, 51, 234, 0.4);
-        }
-
-        /* Hero Container */
-        .hero {
-            max-width: 1280px;
-            margin: 40px auto 100px;
-            padding: 0 36px;
-            text-align: center;
-            position: relative;
-        }
-
-        .pill-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: rgba(147, 51, 234, 0.08);
-            border: 1px solid rgba(147, 51, 234, 0.25);
-            padding: 8px 22px;
-            border-radius: 100px;
-            color: var(--purple-vivid);
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-bottom: 28px;
-            backdrop-filter: blur(12px);
-        }
-        .green-dot {
-            width: 8px; height: 8px;
-            background: #10B981;
-            border-radius: 50%;
-            box-shadow: 0 0 12px #10B981;
-        }
-
         .hero-heading {
-            font-size: clamp(46px, 6.5vw, 84px);
+            font-size: clamp(38px, 4.5vw, 56px);
             font-weight: 800;
-            line-height: 1.08;
-            letter-spacing: -1.5px;
+            line-height: 1.12;
+            letter-spacing: -1.2px;
+            color: var(--purple-dark);
             margin-bottom: 24px;
         }
         .gradient-span {
@@ -190,308 +107,210 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
         .hero-sub {
-            font-size: clamp(17px, 2vw, 21px);
-            color: var(--text-sub);
-            max-width: 780px;
-            margin: 0 auto 40px;
-            font-weight: 500;
+            font-size: 17px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 32px;
         }
 
-        .cta-row {
+        /* Preview Phone Showcase */
+        .phone-frame-container {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            height: 380px;
             display: flex;
-            gap: 18px;
             justify-content: center;
             align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 50px;
+        }
+        .phone-preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 28px;
+            box-shadow: 0 25px 60px -15px rgba(43, 21, 100, 0.25);
+            transition: all 0.4s ease;
         }
 
-        .btn-glow {
-            background: var(--grad-btn);
-            color: #FFF;
-            padding: 18px 42px;
-            border-radius: 100px;
-            font-size: 17px;
-            font-weight: 700;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 14px 35px rgba(43, 21, 100, 0.35);
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .btn-glow:hover {
-            transform: translateY(-4px) scale(1.03);
-            box-shadow: 0 20px 45px rgba(147, 51, 234, 0.5);
-        }
-
-        .btn-glass {
-            background: var(--bg-glass-card);
-            border: 1px solid var(--border-glass);
-            color: var(--text-heading);
-            padding: 18px 36px;
-            border-radius: 100px;
-            font-size: 17px;
-            font-weight: 700;
-            text-decoration: none;
+        /* Right Instagram-Style Login Card */
+        .right-auth-card {
+            width: 100%;
+            max-width: 380px;
+            background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(20px);
-            box-shadow: var(--shadow-glass);
-            transition: all 0.3s ease;
-        }
-        .btn-glass:hover {
-            border-color: var(--border-active);
-            transform: translateY(-2px);
-        }
-
-        /* MODERN GLASSY TABS PREVIEW SWITCHER */
-        .glass-tabs-container {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-            margin: 0 auto 50px;
-            padding: 8px;
-            max-width: 840px;
-            background: rgba(255, 255, 255, 0.75);
-            border: 1px solid var(--border-glass);
-            border-radius: 100px;
-            backdrop-filter: blur(24px);
-            box-shadow: 0 15px 35px rgba(43, 21, 100, 0.08);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(124, 58, 237, 0.18);
+            border-radius: 24px;
+            padding: 36px 32px;
+            box-shadow: 0 20px 50px -10px rgba(43, 21, 100, 0.12);
         }
 
-        .glass-tab {
-            padding: 12px 26px;
-            border-radius: 100px;
-            border: 1px solid transparent;
-            background: transparent;
-            color: var(--text-sub);
+        .auth-brand {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .auth-brand img {
+            height: 40px;
+            object-fit: contain;
+        }
+        .auth-brand p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .input-group {
+            margin-bottom: 14px;
+        }
+        .input-group input {
+            width: 100%;
+            height: 48px;
+            padding: 0 16px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            font-size: 14px;
+            color: var(--text-dark);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        .input-group input:focus {
+            border-color: var(--purple-vivid);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        }
+
+        .btn-login {
+            width: 100%;
+            height: 48px;
+            background: var(--grad-btn);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 12px;
             font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 8px;
-        }
-
-        .glass-tab:hover {
-            color: var(--purple-vivid);
-            background: rgba(147, 51, 234, 0.06);
-        }
-
-        .glass-tab.active {
-            background: #FFFFFF;
-            border-color: var(--border-active);
-            color: var(--purple-main);
-            box-shadow: 0 8px 20px rgba(147, 51, 234, 0.18);
-        }
-
-        /* DRIBBBLE SHOWCASE PHONE HARDWARE FRAME WITH REAL APP SCREENSHOTS */
-        .dribbble-showcase {
-            position: relative;
-            max-width: 1080px;
-            margin: 0 auto;
-            display: flex;
             justify-content: center;
-            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(43, 21, 100, 0.25);
+            transition: all 0.2s ease;
+        }
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 25px rgba(124, 58, 237, 0.35);
         }
 
-        /* Floating Light Badge Widgets */
-        .float-badge {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid var(--border-glass);
-            padding: 16px 24px;
-            border-radius: 22px;
-            backdrop-filter: blur(20px);
-            box-shadow: var(--shadow-float);
+        .divider {
             display: flex;
             align-items: center;
-            gap: 14px;
-            z-index: 10;
-            text-align: left;
-            animation: floatWidget 6s ease-in-out infinite alternate;
+            margin: 22px 0;
+            color: #94A3B8;
+            font-size: 12px;
+            font-weight: 700;
         }
-        .fb-1 { top: 60px; left: -10px; animation-delay: 0s; }
-        .fb-2 { bottom: 80px; right: -10px; animation-delay: -3s; }
-
-        @media (max-width: 990px) { .float-badge { display: none; } }
-
-        @keyframes floatWidget {
-            0% { transform: translateY(0px); }
-            100% { transform: translateY(-15px); }
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #E2E8F0;
         }
+        .divider span { padding: 0 12px; }
 
-        .fb-icon {
-            width: 46px; height: 46px;
-            border-radius: 14px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 22px;
-        }
-        .fb-title { font-size: 15px; font-weight: 700; color: var(--text-heading); }
-        .fb-sub { font-size: 13px; color: var(--text-sub); }
-
-        /* Real Phone Frame Container */
-        .phone-frame {
-            width: 350px;
-            height: 740px;
-            background: #000000;
-            border: 12px solid #1E123B;
-            border-radius: 52px;
-            box-shadow: 0 40px 90px -20px rgba(43, 21, 100, 0.35), 0 0 0 1px rgba(147, 51, 234, 0.25);
-            overflow: hidden;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .phone-notch {
-            width: 130px; height: 26px;
-            background: #1E123B;
-            border-bottom-left-radius: 16px;
-            border-bottom-right-radius: 16px;
-            margin: 0 auto;
-            z-index: 30;
-            position: absolute;
-            top: 0; left: 50%;
-            transform: translateX(-50%);
-        }
-
-        /* Real Screenshot Display */
-        .phone-screen-img {
+        .btn-secondary-link {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: top;
-            border-radius: 40px;
-            transition: opacity 0.4s ease, transform 0.4s ease;
-        }
-
-        /* DRIBBBLE LIGHT BENTO GRID */
-        .bento-section {
-            max-width: 1280px;
-            margin: 120px auto;
-            padding: 0 36px;
-        }
-
-        .bento-head {
-            text-align: center;
-            max-width: 700px;
-            margin: 0 auto 64px;
-        }
-        .bento-tag { color: var(--pink-accent); font-weight: 800; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
-        .bento-title { font-size: clamp(34px, 4.5vw, 54px); font-weight: 800; letter-spacing: -1.5px; }
-
-        .bento-grid {
-            display: grid;
-            grid-template-columns: repeat(12, 1fr);
-            gap: 24px;
-        }
-
-        .bento-box {
-            background: var(--bg-glass-card);
-            border: 1px solid var(--border-glass);
-            border-radius: 32px;
-            padding: 44px;
-            position: relative;
-            overflow: hidden;
-            backdrop-filter: blur(20px);
-            box-shadow: var(--shadow-glass);
-            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-        .bento-box:hover {
-            border-color: var(--border-active);
-            transform: translateY(-6px);
-            box-shadow: var(--shadow-float);
-        }
-
-        .col-8 { grid-column: span 8; }
-        .col-4 { grid-column: span 4; }
-
-        @media (max-width: 900px) {
-            .col-8, .col-4 { grid-column: span 12; }
-        }
-
-        .bento-icon {
-            width: 56px; height: 56px;
-            border-radius: 18px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 26px;
-            margin-bottom: 24px;
-        }
-
-        .bento-box h3 { font-size: 24px; font-weight: 800; margin-bottom: 12px; color: var(--text-heading); }
-        .bento-box p { color: var(--text-sub); font-size: 16px; line-height: 1.65; }
-
-        /* LIGHT CTA BANNER */
-        .cta-box {
-            max-width: 1180px;
-            margin: 120px auto;
-            padding: 80px 48px;
-            background: linear-gradient(135deg, #2B1564 0%, #9333EA 50%, #EC4899 100%);
-            border-radius: 44px;
-            text-align: center;
-            color: #FFF;
-            position: relative;
-            box-shadow: 0 30px 80px rgba(43, 21, 100, 0.35);
-        }
-        .cta-box h2 { font-size: clamp(34px, 4.5vw, 56px); font-weight: 800; color: #FFF; margin-bottom: 18px; }
-        .cta-box p { color: #F3E8FF; font-size: 18px; max-width: 600px; margin: 0 auto 40px; }
-
-        .btn-white {
-            background: #FFFFFF;
-            color: var(--purple-main);
-            padding: 18px 42px;
-            border-radius: 100px;
-            font-size: 17px;
-            font-weight: 800;
+            height: 44px;
+            background: #F1F5F9;
+            color: var(--purple-dark);
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            transition: all 0.3s ease;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
         }
-        .btn-white:hover {
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+        .btn-secondary-link:hover {
+            background: #E2E8F0;
         }
 
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--border-glass);
-            padding: 70px 36px 40px;
-            max-width: 1280px;
-            margin: 0 auto;
-        }
-        .footer-cols {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            gap: 48px;
-            margin-bottom: 60px;
-        }
-        @media (max-width: 850px) { .footer-cols { grid-template-columns: 1fr 1fr; } }
-
-        .footer-desc { color: var(--text-sub); margin-top: 18px; font-size: 14px; max-width: 320px; }
-        .footer-head { font-size: 16px; font-weight: 700; color: var(--text-heading); margin-bottom: 20px; }
-        .footer-list { list-style: none; }
-        .footer-list li { margin-bottom: 12px; }
-        .footer-list a { color: var(--text-sub); text-decoration: none; font-size: 14px; transition: color 0.3s; }
-        .footer-list a:hover { color: var(--purple-vivid); }
-
-        .footer-bottom {
-            padding-top: 32px;
-            border-top: 1px solid rgba(0, 0, 0, 0.06);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: var(--text-muted);
+        .btn-web-app-direct {
+            width: 100%;
+            height: 44px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 12px;
             font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
+            transition: all 0.2s;
+        }
+        .btn-web-app-direct:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(16, 185, 129, 0.35);
+        }
+
+        .error-badge {
+            margin-top: 14px;
+            padding: 10px;
+            background: #FEF2F2;
+            border: 1px solid #FCA5A5;
+            border-radius: 10px;
+            color: #991B1B;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        /* Instagram Style Footer */
+        footer {
+            max-width: 1140px;
+            width: 100%;
+            margin: 20px auto 30px;
+            padding: 0 20px;
+            text-align: center;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
             flex-wrap: wrap;
-            gap: 16px;
+            margin-bottom: 12px;
+        }
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: var(--purple-vivid); }
+        .copyright {
+            font-size: 12px;
+            color: #94A3B8;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 900px) {
+            .insta-container {
+                flex-direction: column;
+                gap: 40px;
+                text-align: center;
+            }
+            .left-showcase { max-width: 100%; }
+            .phone-frame-container { height: 300px; }
         }
     </style>
 </head>
@@ -502,241 +321,100 @@
         <div class="aura aura-2"></div>
         <div class="aura aura-3"></div>
     </div>
-    <div class="grid-overlay"></div>
 
-    <!-- Navigation Header -->
+    <!-- Header Navigation -->
     <header>
-        <a href="#" class="logo-wrap">
+        <a href="/">
             <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="logo-img" onerror="this.src='assets/images/logo.png'">
         </a>
-        <nav>
-            <a href="#features">Features</a>
-            <a href="privacy_policy.html">Privacy Policy</a>
-            <a href="/app/" class="btn-header" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);"><i class="fa-solid fa-globe"></i> Open Web App</a>
-            <button onclick="openUnifiedLoginModal()" class="btn-header" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); border: none; cursor: pointer;"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
-        </nav>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <a href="/app/" class="btn-secondary-link" style="margin-bottom: 0; width: auto; padding: 0 20px;"><i class="fa-solid fa-globe"></i> Web App</a>
+            <a href="/admin/" class="btn-secondary-link" style="margin-bottom: 0; width: auto; padding: 0 20px; background: rgba(124, 58, 237, 0.1); color: var(--purple-vivid);"><i class="fa-solid fa-user-shield"></i> Admin</a>
+        </div>
     </header>
 
-    <!-- Main Hero -->
-    <main class="hero">
-        <div class="pill-badge">
-            <span class="green-dot"></span> EXPLORE THE UNEXPLORED
+    <!-- Instagram-Style Main Container -->
+    <div class="insta-container">
+
+        <!-- Left Showcase Column -->
+        <div class="left-showcase">
+            <h1 class="hero-heading">
+                Explore everyday moments from your <br>
+                <span class="gradient-span">travel squad.</span>
+            </h1>
+            <p class="hero-sub">
+                Hidely is the premier social platform for discovering hidden places, navigating offline with compass maps, and sharing travel moments.
+            </p>
+
+            <div class="phone-frame-container">
+                <img src="assets/images/real_app_feed.png" alt="Hidely App" class="phone-preview-img" onerror="this.src='assets/images/real_app_profile.png'">
+            </div>
         </div>
 
-        <h1 class="hero-heading font-logo">
-            Explore Places, Share Moments <br>
-            <span class="gradient-span">&amp; Connect Seamlessly.</span>
-        </h1>
+        <!-- Right Instagram-Style Login Card -->
+        <div class="right-auth-card">
+            <div class="auth-brand">
+                <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" onerror="this.src='assets/images/logo.png'">
+                <p>Log into your Hidely account</p>
+            </div>
 
-        <p class="hero-sub">
-            Hidely is the next-generation location platform. Discover nearby stays, navigate with offline compass maps, and start HD voice &amp; video calls effortlessly.
-        </p>
-
-        <div class="cta-row">
-            <a href="app-release.apk" download class="btn-glow">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a1.5 1.5 0 0 1-2.122-2.122L9.549 12 1.488 3.936a1.5 1.5 0 0 1 2.121-2.122zm16.782 8.064l-4.576-4.576L13.792 7.32l4.576 4.576a1.5 1.5 0 0 0 2.023-2.018z"/></svg>
-                Download Release APK
-            </a>
-            <a href="/app/" class="btn-glow" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
-                <i class="fa-solid fa-globe"></i> Launch Web Platform
-            </a>
-            <a href="privacy_policy.html" class="btn-glass">Privacy Policy</a>
-        </div>
-
-        <!-- MODERN GLASSY TABS PREVIEW SWITCHER -->
-        <div class="glass-tabs-container">
-            <button class="glass-tab active" onclick="switchAppScreen('feed', this)">
-                📸 Explore Feed
-            </button>
-            <button class="glass-tab" onclick="switchAppScreen('map', this)">
-                📍 GPS Map Navigation
-            </button>
-            <button class="glass-tab" onclick="switchAppScreen('profile', this)">
-                👤 User Profile
-            </button>
-        </div>
-
-        <!-- DRIBBBLE SHOWCASE HARDWARE MOCKUP WITH REAL APP SCREENSHOTS -->
-        <div class="dribbble-showcase">
-            
-            <!-- Left Floating Widget -->
-            <div class="float-badge fb-1">
-                <div class="fb-icon" style="background: rgba(147, 51, 234, 0.1); color: #9333EA;">📍</div>
-                <div>
-                    <div class="fb-title">Offline GPS Routing</div>
-                    <div class="fb-sub">Direct compass navigation</div>
+            <form id="insta-login-form" onsubmit="handleInstaLogin(event)">
+                <div class="input-group">
+                    <input type="text" id="insta-email" placeholder="Phone number, username or email" required>
                 </div>
-            </div>
-
-            <!-- Right Floating Widget -->
-            <div class="float-badge fb-2">
-                <div class="fb-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;">📞</div>
-                <div>
-                    <div class="fb-title">HD Voice &amp; Video</div>
-                    <div class="fb-sub">Encrypted &amp; zero-latency</div>
-                </div>
-            </div>
-
-            <!-- Central Mobile Phone Frame -->
-            <div class="phone-frame">
-                <div class="phone-notch"></div>
-                <img id="realAppImage" src="assets/images/real_app_feed.png" alt="Hidely App Screen" class="phone-screen-img">
-            </div>
-
-        </div>
-    </main>
-
-    <!-- DRIBBBLE LIGHT BENTO GRID -->
-    <section class="bento-section" id="features">
-        <div class="bento-head">
-            <div class="bento-tag">UNRIVALED EXPERIENCE</div>
-            <h2 class="bento-title font-logo">Engineered For Exploration</h2>
-        </div>
-
-        <div class="bento-grid">
-            <div class="bento-box col-8">
-                <div class="bento-icon" style="background: rgba(147, 51, 234, 0.1); color: #9333EA;">🗺️</div>
-                <h3>Contextual Nearby Discovery</h3>
-                <p>Dynamically discover verified stays, local cafes, scenic spots, and hidden attractions customized precisely to your live coordinates and travel preferences.</p>
-            </div>
-
-            <div class="bento-box col-4">
-                <div class="bento-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;">📡</div>
-                <h3>Offline GPS Resilience</h3>
-                <p>Never lose your way. Hidely computes bearing calculations and straight-line routes even in offline zones.</p>
-            </div>
-
-            <div class="bento-box col-4">
-                <div class="bento-icon" style="background: rgba(236, 72, 153, 0.1); color: #EC4899;">📞</div>
-                <h3>HD Voice &amp; Video</h3>
-                <p>Connect with travel creators and friends globally via low-latency Zego Cloud calls.</p>
-            </div>
-
-            <div class="bento-box col-8">
-                <div class="bento-icon" style="background: rgba(2, 132, 199, 0.1); color: #0284C7;">🔒</div>
-                <h3>Strict Data Security &amp; Privacy</h3>
-                <p>Your location data is strictly processed for live context. We enforce end-to-end encryption protocols and never sell user data.</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- LIGHT CTA BANNER -->
-    <section class="cta-box">
-        <h2 class="font-logo">Start Your Journey Today</h2>
-        <p>Download Hidely for Android and unlock a new way to explore, connect, and share.</p>
-        <a href="app-release.apk" download class="btn-white">Download Release APK</a>
-    </section>
-
-    <!-- FOOTER -->
-    <footer>
-        <div class="footer-cols">
-            <div>
-                <a href="#" class="logo-wrap">
-                    <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="logo-img" onerror="this.src='assets/images/logo.png'">
-                </a>
-                <p class="footer-desc">The next-generation location platform for discovering nearby stays, navigating offline, and making HD calls.</p>
-            </div>
-            <div>
-                <h4 class="footer-head">Product</h4>
-                <ul class="footer-list">
-                    <li><a href="#features">Features</a></li>
-                    <li><a href="#">Google Play Store</a></li>
-                    <li><a href="#">Release Build</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 class="footer-head">Legal</h4>
-                <ul class="footer-list">
-                    <li><a href="privacy_policy.html">Privacy Policy</a></li>
-                    <li><a href="#">Terms of Service</a></li>
-                    <li><a href="#">Security Policy</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 class="footer-head">Support</h4>
-                <ul class="footer-list">
-                    <li><a href="mailto:support@kittuvirusstudio.in">support@kittuvirusstudio.in</a></li>
-                    <li><a href="https://kittuvirusstudio.in">Kittu Virus Studio</a></li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="footer-bottom">
-            <div>&copy; 2026 Hidely — A Kittu Virus Studio Experience. All rights reserved.</div>
-            <div>Google Play Store Pre-Release Verified</div>
-        </div>
-    </footer>
-
-    <!-- UNIFIED LOGIN MODAL -->
-    <div id="unified-login-modal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); align-items: center; justify-content: center; padding: 20px;">
-        <div style="background: #ffffff; width: 100%; max-width: 420px; border-radius: 24px; padding: 32px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); position: relative; font-family: 'Outfit', sans-serif;">
-            <button onclick="closeUnifiedLoginModal()" style="position: absolute; top: 20px; right: 20px; background: #F1F5F9; border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748B; font-size: 16px;">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <div style="text-align: center; margin-bottom: 24px;">
-                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #2B1564 0%, #4F46E5 100%); border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 24px; margin-bottom: 12px; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);">
-                    <i class="fa-solid fa-compass"></i>
-                </div>
-                <h2 style="font-size: 22px; font-weight: 800; color: #1E293B; margin: 0 0 6px 0;">Login to Hidely</h2>
-                <p style="font-size: 14px; color: #64748B; margin: 0;">Sign in to access your Web Social Feed or Admin Panel</p>
-            </div>
-
-            <form id="unified-login-form" onsubmit="handleUnifiedLogin(event)">
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 6px;">Email or Username</label>
-                    <input type="text" id="unified-email" placeholder="e.g. user@hidely.com or admin@hidely.com" required style="width: 100%; height: 48px; padding: 0 16px; border: 1.5px solid #E2E8F0; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; transition: all 0.2s;">
-                </div>
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 6px;">Password</label>
-                    <input type="password" id="unified-password" placeholder="••••••••" required style="width: 100%; height: 48px; padding: 0 16px; border: 1.5px solid #E2E8F0; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; transition: all 0.2s;">
+                <div class="input-group">
+                    <input type="password" id="insta-password" placeholder="Password" required>
                 </div>
 
-                <button type="submit" id="unified-submit-btn" style="width: 100%; height: 50px; background: linear-gradient(135deg, #2B1564 0%, #4F46E5 100%); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 10px 15px -3px rgba(43, 21, 100, 0.3);">
-                    <i class="fa-solid fa-right-to-bracket"></i> Continue to Account
+                <button type="submit" id="insta-submit-btn" class="btn-login">
+                    <i class="fa-solid fa-right-to-bracket"></i> Log In
                 </button>
             </form>
 
-            <div id="unified-login-error" style="display: none; margin-top: 16px; padding: 12px; background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 10px; color: #991B1B; font-size: 13px; font-weight: 600; text-align: center;"></div>
+            <div id="insta-login-error" class="error-badge" style="display: none;"></div>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <a href="/app/" class="btn-web-app-direct">
+                <i class="fa-solid fa-compass"></i> Open Web Social Platform
+            </a>
+
+            <div style="height: 10px;"></div>
+
+            <a href="app-release.apk" download class="btn-secondary-link">
+                <i class="fa-solid fa-download"></i> Download Android APK
+            </a>
         </div>
+
     </div>
 
+    <!-- Instagram Style Footer -->
+    <footer>
+        <div class="footer-links">
+            <a href="/app/">Web App</a>
+            <a href="/admin/">Admin Console</a>
+            <a href="privacy_policy.html">Privacy Policy</a>
+            <a href="delete_account.html">Delete Account</a>
+            <a href="mailto:support@kittuvirusstudio.in">Support</a>
+        </div>
+        <div class="copyright">
+            &copy; 2026 Hidely from Kittu Virus Studio. All rights reserved.
+        </div>
+    </footer>
+
     <script>
-        function switchAppScreen(type, el) {
-            document.querySelectorAll('.glass-tab').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            const img = document.getElementById('realAppImage');
-            img.style.opacity = '0';
-            setTimeout(() => {
-                if (type === 'feed') {
-                    img.src = 'assets/images/real_app_feed.png';
-                } else if (type === 'map') {
-                    img.src = 'assets/images/real_app_map.png';
-                } else if (type === 'profile') {
-                    img.src = 'assets/images/real_app_profile.png';
-                }
-                img.style.opacity = '1';
-            }, 200);
-        }
-
-        function openUnifiedLoginModal() {
-            document.getElementById('unified-login-modal').style.display = 'flex';
-            document.getElementById('unified-login-error').style.display = 'none';
-        }
-
-        function closeUnifiedLoginModal() {
-            document.getElementById('unified-login-modal').style.display = 'none';
-        }
-
-        async function handleUnifiedLogin(e) {
+        async function handleInstaLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('unified-email').value.trim();
-            const password = document.getElementById('unified-password').value;
-            const errBox = document.getElementById('unified-login-error');
-            const btn = document.getElementById('unified-submit-btn');
+            const email = document.getElementById('insta-email').value.trim();
+            const password = document.getElementById('insta-password').value;
+            const errBox = document.getElementById('insta-login-error');
+            const btn = document.getElementById('insta-submit-btn');
 
             errBox.style.display = 'none';
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in...';
 
             try {
                 const res = await fetch('https://hidely-backend.onrender.com/api/auth/login', {
@@ -746,10 +424,10 @@
                 });
                 const data = await res.json();
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Continue to Account';
+                btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Log In';
 
                 if (!res.ok) {
-                    errBox.textContent = data.error || 'Invalid credentials. Please try again.';
+                    errBox.textContent = data.error || 'Invalid username/email or password.';
                     errBox.style.display = 'block';
                     return;
                 }
@@ -758,15 +436,15 @@
                 localStorage.setItem('hidely_user', JSON.stringify(data.user));
 
                 if (data.user && (data.user.is_admin || data.user.email === 'admin@hidely.com')) {
-                    // Open Admin Panel!
+                    // Admin User -> Redirect to Admin Panel!
                     window.location.href = '/admin/';
                 } else {
-                    // Open Instagram-like Hidely Web App!
+                    // Normal User -> Redirect to Instagram-like Hidely Web App!
                     window.location.href = '/app/';
                 }
             } catch (err) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Continue to Account';
+                btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Log In';
                 errBox.textContent = 'Server connection error. Please try again.';
                 errBox.style.display = 'block';
             }
