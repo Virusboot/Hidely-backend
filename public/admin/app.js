@@ -58,8 +58,12 @@ async function handleLogin(e) {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   const errBox = document.getElementById('login-error');
+  const submitBtn = document.querySelector('#login-form button[type="submit"]');
 
   errBox.classList.add('hidden');
+  const originalBtnHtml = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to Console...';
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
@@ -69,8 +73,11 @@ async function handleLogin(e) {
     });
 
     const data = await res.json();
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalBtnHtml;
+
     if (!res.ok) {
-      errBox.textContent = data.error || 'Login failed.';
+      errBox.textContent = data.error || 'Login failed. Please check your credentials.';
       errBox.classList.remove('hidden');
       return;
     }
@@ -82,7 +89,10 @@ async function handleLogin(e) {
 
     showDashboard();
   } catch (err) {
-    errBox.textContent = 'Server connection error.';
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalBtnHtml;
+    console.error('Login error:', err);
+    errBox.textContent = 'Backend server connection error. Please try again.';
     errBox.classList.remove('hidden');
   }
 }
