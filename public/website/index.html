@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="build-version" content="2026.09.02.1600">
+    <meta name="build-version" content="2026.09.02.1605">
     <title>Hidely — Social Places Discovery Platform</title>
     <meta name="description" content="Hidely is the next-gen location-contextual social platform for secret spots discovery, offline compass navigation, and travel squad stories.">
 
@@ -18,16 +18,15 @@
 
     <style>
         :root {
-            --bg-dark: #0B0819;
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --card-border: rgba(255, 255, 255, 0.12);
-            --purple-main: #8B5CF6;
-            --blue-main: #3B82F6;
-            --pink-accent: #EC4899;
-            --text-light: #F8FAFC;
-            --text-muted: #94A3B8;
-            --grad-accent: linear-gradient(135deg, #A78BFA 0%, #60A5FA 50%, #F472B6 100%);
-            --grad-btn: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+            --bg-page: #FAFAFC;
+            --purple-main: #2B1564;
+            --purple-dark: #1C0D5A;
+            --purple-vivid: #7C3AED;
+            --text-dark: #0F172A;
+            --text-muted: #64748B;
+            --border-light: #E2E8F0;
+            --grad-brand: linear-gradient(135deg, #1C0D5A 0%, #2B1564 45%, #7C3AED 100%);
+            --grad-btn: linear-gradient(135deg, #2B1564 0%, #7C3AED 100%);
             --font-head: 'Sora', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
@@ -35,8 +34,8 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-body); }
 
         body {
-            background-color: var(--bg-dark);
-            color: var(--text-light);
+            background-color: var(--bg-page);
+            color: var(--text-dark);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -46,75 +45,74 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* 3D Glowing Ambient Mesh Lights */
-        .mesh-lights {
+        /* Ambient Pastel Aura Lights (App Matched) */
+        .ambient-mesh {
             position: fixed;
             inset: 0;
             z-index: -1;
             pointer-events: none;
             overflow: hidden;
         }
-        .orb {
+        .aura {
             position: absolute;
             border-radius: 50%;
             filter: blur(140px);
-            opacity: 0.45;
+            opacity: 0.65;
         }
-        .orb-1 { width: 650px; height: 650px; background: #8B5CF6; top: -200px; left: -100px; }
-        .orb-2 { width: 550px; height: 550px; background: #3B82F6; bottom: -150px; right: -50px; }
-        .orb-3 { width: 450px; height: 450px; background: #EC4899; top: 40%; left: 30%; opacity: 0.25; }
+        .aura-1 { width: 650px; height: 650px; background: #E0F2FE; top: -150px; left: 5%; }
+        .aura-2 { width: 550px; height: 550px; background: #DDD6FE; top: 250px; right: -100px; }
 
-        /* Floating Glassmorphic Top Navbar */
+        /* Floating Top Glass Header */
         header {
-            max-width: 1240px;
+            max-width: 1280px;
             width: 90%;
-            margin: 24px auto 0;
-            padding: 14px 28px;
+            margin: 20px auto 0;
+            padding: 14px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.88);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid var(--card-border);
+            border: 1px solid rgba(124, 58, 237, 0.15);
             border-radius: 100px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 30px rgba(43, 21, 100, 0.04);
             position: sticky;
-            top: 20px;
+            top: 15px;
             z-index: 100;
         }
-        .logo-img { height: 38px; object-fit: contain; filter: brightness(0) invert(1); }
+        .logo-img { height: 40px; object-fit: contain; }
 
         nav { display: flex; gap: 32px; align-items: center; }
         nav a {
             color: var(--text-muted);
             text-decoration: none;
-            font-size: 14px;
+            font-size: 14.5px;
             font-weight: 600;
             transition: color 0.2s ease;
         }
-        nav a:hover { color: #FFFFFF; }
+        nav a:hover { color: var(--purple-vivid); }
 
         .btn-header-cta {
             background: var(--grad-btn);
             color: #FFFFFF !important;
-            padding: 10px 22px;
+            padding: 10px 24px;
             border-radius: 40px;
             font-weight: 700;
             font-size: 14px;
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 6px 20px rgba(43, 21, 100, 0.25);
             transition: all 0.3s ease;
         }
         .btn-header-cta:hover {
             transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(139, 92, 246, 0.6);
+            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.4);
         }
 
         /* Hero Split 2-Column Section */
         .hero-container {
             max-width: 1280px;
             width: 100%;
-            margin: 50px auto 40px;
+            margin: 45px auto 40px;
             padding: 0 32px;
             display: flex;
             align-items: center;
@@ -133,12 +131,12 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(139, 92, 246, 0.15);
-            border: 1px solid rgba(139, 92, 246, 0.35);
+            background: #F3E8FF;
+            border: 1px solid rgba(124, 58, 237, 0.25);
             padding: 8px 20px;
             border-radius: 100px;
-            color: #C4B5FD;
-            font-size: 13px;
+            color: var(--purple-vivid);
+            font-size: 12.5px;
             font-weight: 700;
             letter-spacing: 0.6px;
             text-transform: uppercase;
@@ -157,12 +155,12 @@
             font-weight: 800;
             line-height: 1.1;
             letter-spacing: -1.5px;
-            color: #FFFFFF;
+            color: var(--purple-dark);
             margin-bottom: 24px;
         }
 
         .gradient-text {
-            background: var(--grad-accent);
+            background: var(--grad-brand);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -176,7 +174,7 @@
             font-weight: 500;
         }
 
-        /* Hero App Store Download Buttons (Replaces GPS Tabs) */
+        /* App Store Download Buttons (Left Column) */
         .hero-store-buttons {
             display: flex;
             gap: 16px;
@@ -195,28 +193,27 @@
         .hero-store-btn.playstore {
             background: linear-gradient(135deg, #10B981 0%, #059669 100%);
             color: #FFFFFF;
-            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.35);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
         }
         .hero-store-btn.playstore:hover {
             transform: translateY(-3px);
-            box-shadow: 0 15px 35px rgba(16, 185, 129, 0.5);
+            box-shadow: 0 15px 35px rgba(16, 185, 129, 0.45);
         }
 
         .hero-store-btn.appstore {
-            background: rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: var(--purple-main);
             color: #FFFFFF;
+            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.25);
             cursor: default;
         }
 
         .hero-store-btn i { font-size: 28px; }
         .hero-store-text { text-align: left; line-height: 1.2; }
-        .hero-store-text .caption { font-size: 9.5px; font-weight: 600; text-transform: uppercase; opacity: 0.8; display: block; letter-spacing: 0.5px; }
+        .hero-store-text .caption { font-size: 9.5px; font-weight: 600; text-transform: uppercase; opacity: 0.85; display: block; letter-spacing: 0.5px; }
         .hero-store-text .title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
 
         .badge-soon-pill {
-            background: var(--purple-main);
+            background: rgba(255, 255, 255, 0.25);
             color: #FFFFFF;
             font-size: 8px;
             font-weight: 800;
@@ -225,7 +222,7 @@
             text-transform: uppercase;
         }
 
-        /* Right Column Glassmorphic Auth Card */
+        /* Right Column Auth Card (Light App Theme) */
         .right-auth-column {
             flex: 1;
             max-width: 380px;
@@ -234,22 +231,19 @@
             gap: 16px;
         }
 
-        .auth-glass-card {
-            background: rgba(255, 255, 255, 0.04);
-            backdrop-filter: blur(30px);
-            -webkit-backdrop-filter: blur(30px);
-            border: 1px solid var(--card-border);
+        .auth-light-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
             border-radius: 24px;
             padding: 36px 32px 28px;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 50px rgba(43, 21, 100, 0.08);
             text-align: center;
         }
 
         .auth-brand-logo {
-            height: 42px;
+            height: 44px;
             object-fit: contain;
             margin-bottom: 24px;
-            filter: brightness(0) invert(1);
         }
 
         .input-box {
@@ -259,19 +253,19 @@
             width: 100%;
             height: 46px;
             padding: 0 16px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
             border-radius: 12px;
             font-size: 14px;
-            color: #FFFFFF;
+            color: var(--text-dark);
             outline: none;
             transition: all 0.25s ease;
         }
-        .input-box input::placeholder { color: #64748B; }
+        .input-box input::placeholder { color: #94A3B8; }
         .input-box input:focus {
-            border-color: var(--purple-main);
-            background: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+            border-color: var(--purple-vivid);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
         }
 
         .btn-submit-login {
@@ -285,19 +279,19 @@
             font-weight: 700;
             cursor: pointer;
             margin-top: 8px;
-            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.25);
             transition: all 0.25s ease;
         }
         .btn-submit-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 14px 30px rgba(139, 92, 246, 0.6);
+            box-shadow: 0 14px 30px rgba(43, 21, 100, 0.4);
         }
 
         .divider-or {
             display: flex;
             align-items: center;
             margin: 20px 0;
-            color: #64748B;
+            color: #94A3B8;
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 0.5px;
@@ -306,16 +300,16 @@
             content: "";
             flex: 1;
             height: 1px;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--border-light);
         }
         .divider-or span { padding: 0 14px; }
 
         .btn-guest-explore {
             width: 100%;
             height: 44px;
-            background: rgba(255, 255, 255, 0.08);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: #F1F5F9;
+            color: var(--text-dark);
+            border: 1px solid var(--border-light);
             border-radius: 12px;
             font-size: 14.5px;
             font-weight: 700;
@@ -327,8 +321,7 @@
             transition: all 0.25s ease;
         }
         .btn-guest-explore:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
+            background: #E2E8F0;
         }
 
         .signup-text {
@@ -337,7 +330,7 @@
             margin-top: 18px;
         }
         .signup-text a {
-            color: #C4B5FD;
+            color: var(--purple-vivid);
             font-weight: 700;
             text-decoration: none;
         }
@@ -346,21 +339,21 @@
         .err-msg-box {
             margin-top: 10px;
             padding: 10px;
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: #FEF2F2;
+            border: 1px solid #FCA5A5;
             border-radius: 8px;
-            color: #FCA5A5;
+            color: #991B1B;
             font-size: 12.5px;
             font-weight: 600;
         }
 
-        /* Minimal Footer */
+        /* Clean Minimal Footer */
         footer {
             max-width: 1280px;
             width: 100%;
             margin: 40px auto 24px;
             padding: 20px 32px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid var(--border-light);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -375,7 +368,7 @@
             text-decoration: none;
             transition: color 0.2s ease;
         }
-        .footer-links-row a:hover { color: #FFFFFF; }
+        .footer-links-row a:hover { color: var(--purple-vivid); }
 
         @media (max-width: 960px) {
             .hero-container { flex-direction: column; gap: 40px; text-align: center; }
@@ -388,20 +381,19 @@
 </head>
 <body>
 
-    <!-- 3D Glowing Ambient Lights -->
-    <div class="mesh-lights">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
+    <!-- Ambient Pastel Aura Lights -->
+    <div class="ambient-mesh">
+        <div class="aura aura-1"></div>
+        <div class="aura aura-2"></div>
     </div>
 
-    <!-- Floating Top Navbar -->
+    <!-- Floating Top Glass Header -->
     <header>
         <a href="/">
             <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="logo-img" onerror="this.src='assets/images/logo.png'">
         </a>
         <nav>
-            <a href="/app/">Explore</a>
+            <a href="/app/">Explore Places</a>
             <a href="privacy_policy.html">Privacy Policy</a>
             <a href="/admin/">Admin Portal</a>
             <a href="/app/" class="btn-header-cta"><i class="fa-solid fa-compass"></i> Open Web Social App</a>
@@ -424,7 +416,7 @@
                 The location-contextual social platform for discovering secret stays, navigating with offline compass maps, and connecting live with your travel squad.
             </p>
 
-            <!-- Prominent App Store & Play Store Download Buttons (Replaces GPS Tabs) -->
+            <!-- Prominent App Store & Play Store Download Buttons -->
             <div class="hero-store-buttons">
                 <!-- Google Play Store Direct APK -->
                 <a href="app-release.apk" download class="hero-store-btn playstore">
@@ -446,9 +438,9 @@
             </div>
         </div>
 
-        <!-- Right Column Glassmorphic Auth Card -->
+        <!-- Right Column Light Auth Card -->
         <div class="right-auth-column">
-            <div class="auth-glass-card">
+            <div class="auth-light-card">
                 <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="auth-brand-logo" onerror="this.src='assets/images/logo.png'">
 
                 <form id="main-auth-form" onsubmit="handleMainAuth(event)">
