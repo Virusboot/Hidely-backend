@@ -60,7 +60,7 @@ body {
 }
 
 .auth-brand-logo {
-  height: 46px;
+  height: 56px;
   object-fit: contain;
   margin: 0 auto;
   display: block;
@@ -232,7 +232,7 @@ body {
 }
 
 .admin-sidebar-logo {
-  height: 38px;
+  height: 52px;
   object-fit: contain;
 }
 
