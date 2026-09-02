@@ -338,6 +338,29 @@
         }
         .signup-text a:hover { text-decoration: underline; }
 
+        .auth-store-divider {
+            margin: 18px 0 14px;
+            height: 1px;
+            background: var(--border-light);
+        }
+
+        .auth-store-buttons {
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .auth-store-buttons .hero-store-btn {
+            flex: 1;
+            justify-content: center;
+            padding: 10px 10px;
+            border-radius: 12px;
+            gap: 8px;
+        }
+
+        .auth-store-buttons .hero-store-btn i { font-size: 22px; }
+        .auth-store-buttons .hero-store-text .title { font-size: 13px; }
+        .auth-store-buttons .hero-store-text .caption { font-size: 8.5px; }
+
         .err-msg-box {
             margin-top: 10px;
             padding: 10px;
@@ -529,26 +552,6 @@
                 The location-contextual social platform for discovering secret stays, navigating with offline compass maps, and connecting live with your travel squad.
             </p>
 
-            <!-- Prominent App Store & Play Store Download Buttons -->
-            <div class="hero-store-buttons">
-                <!-- Google Play Store Direct APK -->
-                <a href="app-release.apk" download class="hero-store-btn playstore">
-                    <i class="fa-brands fa-google-play"></i>
-                    <div class="hero-store-text">
-                        <span class="caption">GET IT ON</span>
-                        <span class="title">Google Play</span>
-                    </div>
-                </a>
-
-                <!-- Apple App Store (Coming Soon) -->
-                <div class="hero-store-btn appstore">
-                    <i class="fa-brands fa-apple"></i>
-                    <div class="hero-store-text">
-                        <span class="caption">DOWNLOAD ON THE</span>
-                        <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Right Column Light Auth Card -->
@@ -576,12 +579,34 @@
                 </div>
 
                 <a href="/app/" class="btn-guest-explore">
-                    <i class="fa-solid fa-compass"></i> Explore Feed & Places
+                    <i class="fa-solid fa-compass"></i> Explore Feed &amp; Places
                 </a>
 
                 <p class="signup-text">
                     Don't have an account? <a href="/app/">Sign up</a>
                 </p>
+
+                <!-- App Download Buttons below login form -->
+                <div class="auth-store-divider"></div>
+                <div class="hero-store-buttons auth-store-buttons">
+                    <!-- Google Play Store Direct APK -->
+                    <a href="app-release.apk" download class="hero-store-btn playstore">
+                        <i class="fa-brands fa-google-play"></i>
+                        <div class="hero-store-text">
+                            <span class="caption">GET IT ON</span>
+                            <span class="title">Google Play</span>
+                        </div>
+                    </a>
+
+                    <!-- Apple App Store (Coming Soon) -->
+                    <div class="hero-store-btn appstore">
+                        <i class="fa-brands fa-apple"></i>
+                        <div class="hero-store-text">
+                            <span class="caption">DOWNLOAD ON THE</span>
+                            <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
