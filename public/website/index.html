@@ -338,28 +338,9 @@
         }
         .signup-text a:hover { text-decoration: underline; }
 
-        .auth-store-divider {
-            margin: 18px 0 14px;
-            height: 1px;
-            background: var(--border-light);
-        }
-
-        .auth-store-buttons {
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .auth-store-buttons .hero-store-btn {
-            flex: 1;
-            justify-content: center;
-            padding: 10px 10px;
-            border-radius: 12px;
-            gap: 8px;
-        }
-
-        .auth-store-buttons .hero-store-btn i { font-size: 22px; }
-        .auth-store-buttons .hero-store-text .title { font-size: 13px; }
-        .auth-store-buttons .hero-store-text .caption { font-size: 8.5px; }
+        /* App Store Buttons display logic */
+        .desktop-store-btns { display: flex; }
+        .mobile-store-btns { display: none; margin-top: 20px; }
 
         .err-msg-box {
             margin-top: 10px;
@@ -395,7 +376,7 @@
         }
         .footer-links-row a:hover { color: var(--purple-vivid); }
 
-        /* ===== TABLET (≤960px) ===== */
+        /* ===== TABLET & MOBILE (≤960px) ===== */
         @media (max-width: 960px) {
             header { padding: 12px 24px; }
             nav { gap: 20px; }
@@ -404,7 +385,8 @@
             .hero-left { max-width: 100%; }
             .right-auth-column { max-width: 440px; width: 100%; margin: 0 auto; }
             .hero-description { margin-left: auto; margin-right: auto; font-size: 16px; }
-            .hero-store-buttons { justify-content: center; }
+            .desktop-store-btns { display: none !important; }
+            .mobile-store-btns { display: flex !important; justify-content: center; }
             footer { flex-direction: column; text-align: center; gap: 12px; padding: 16px 24px 0; }
             .footer-links-row { flex-wrap: wrap; justify-content: center; gap: 14px; }
         }
@@ -552,6 +534,23 @@
                 The location-contextual social platform for discovering secret stays, navigating with offline compass maps, and connecting live with your travel squad.
             </p>
 
+            <!-- Store buttons: desktop only (hidden on mobile via CSS) -->
+            <div class="hero-store-buttons desktop-store-btns">
+                <a href="app-release.apk" download class="hero-store-btn playstore">
+                    <i class="fa-brands fa-google-play"></i>
+                    <div class="hero-store-text">
+                        <span class="caption">GET IT ON</span>
+                        <span class="title">Google Play</span>
+                    </div>
+                </a>
+                <div class="hero-store-btn appstore">
+                    <i class="fa-brands fa-apple"></i>
+                    <div class="hero-store-text">
+                        <span class="caption">DOWNLOAD ON THE</span>
+                        <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Column Light Auth Card -->
@@ -585,26 +584,22 @@
                 <p class="signup-text">
                     Don't have an account? <a href="/app/">Sign up</a>
                 </p>
+            </div>
 
-                <!-- App Download Buttons below login form -->
-                <div class="auth-store-divider"></div>
-                <div class="hero-store-buttons auth-store-buttons">
-                    <!-- Google Play Store Direct APK -->
-                    <a href="app-release.apk" download class="hero-store-btn playstore">
-                        <i class="fa-brands fa-google-play"></i>
-                        <div class="hero-store-text">
-                            <span class="caption">GET IT ON</span>
-                            <span class="title">Google Play</span>
-                        </div>
-                    </a>
-
-                    <!-- Apple App Store (Coming Soon) -->
-                    <div class="hero-store-btn appstore">
-                        <i class="fa-brands fa-apple"></i>
-                        <div class="hero-store-text">
-                            <span class="caption">DOWNLOAD ON THE</span>
-                            <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
-                        </div>
+            <!-- Mobile-only store buttons: separate below auth card -->
+            <div class="hero-store-buttons mobile-store-btns">
+                <a href="app-release.apk" download class="hero-store-btn playstore">
+                    <i class="fa-brands fa-google-play"></i>
+                    <div class="hero-store-text">
+                        <span class="caption">GET IT ON</span>
+                        <span class="title">Google Play</span>
+                    </div>
+                </a>
+                <div class="hero-store-btn appstore">
+                    <i class="fa-brands fa-apple"></i>
+                    <div class="hero-store-text">
+                        <span class="caption">DOWNLOAD ON THE</span>
+                        <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
                     </div>
                 </div>
             </div>
