@@ -7,91 +7,111 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Hidely — Social Places Discovery Platform</title>
-    <meta name="description" content="Hidely is the location-contextual social platform for discovering secret travel stays, offline compass navigation, and travel squad stories.">
+    <meta name="description" content="Hidely is the next-gen location-contextual social platform for secret spots discovery, offline compass navigation, and travel squad stories.">
 
-    <!-- Premium Google Fonts: Outfit & Inter -->
+    <!-- Premium Google Fonts: Outfit & Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         :root {
-            --primary: #2B1564;
-            --primary-dark: #1C0D5A;
-            --accent: #4F46E5;
-            --bg-page: #FAFAFC;
-            --text-main: #0F172A;
-            --text-muted: #64748B;
-            --border-light: #E2E8F0;
+            --bg-dark: #0B0819;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --purple-main: #8B5CF6;
+            --blue-main: #3B82F6;
+            --pink-accent: #EC4899;
+            --text-light: #F8FAFC;
+            --text-muted: #94A3B8;
+            --grad-accent: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #EC4899 100%);
+            --grad-btn: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
 
         body {
-            background-color: var(--bg-page);
-            color: var(--text-main);
+            background-color: var(--bg-dark);
+            color: var(--text-light);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             overflow-x: hidden;
+            position: relative;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Ambient Glow */
-        .ambient-glow {
+        /* 3D Glowing Ambient Mesh Lights */
+        .mesh-lights {
             position: fixed;
-            top: -120px;
-            left: 15%;
-            width: 700px;
-            height: 700px;
-            background: radial-gradient(circle, rgba(79, 70, 229, 0.08) 0%, rgba(255, 255, 255, 0) 70%);
-            pointer-events: none;
+            inset: 0;
             z-index: -1;
+            pointer-events: none;
+            overflow: hidden;
         }
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(140px);
+            opacity: 0.45;
+        }
+        .orb-1 { width: 650px; height: 650px; background: #8B5CF6; top: -200px; left: -100px; }
+        .orb-2 { width: 550px; height: 550px; background: #3B82F6; bottom: -150px; right: -50px; }
+        .orb-3 { width: 450px; height: 450px; background: #EC4899; top: 40%; left: 30%; opacity: 0.25; }
 
-        /* Clean Header */
+        /* Floating Glassmorphic Top Navbar */
         header {
-            max-width: 1280px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 24px 32px;
+            max-width: 1240px;
+            width: 90%;
+            margin: 24px auto 0;
+            padding: 14px 28px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--card-border);
+            border-radius: 100px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            position: sticky;
+            top: 20px;
+            z-index: 100;
         }
-        .logo-img { height: 38px; object-fit: contain; }
+        .logo-img { height: 38px; object-fit: contain; filter: brightness(0) invert(1); }
 
         nav { display: flex; gap: 32px; align-items: center; }
         nav a {
             color: var(--text-muted);
             text-decoration: none;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             transition: color 0.2s ease;
         }
-        nav a:hover { color: var(--text-main); }
+        nav a:hover { color: #FFFFFF; }
 
-        .btn-nav-primary {
-            background: var(--primary);
+        .btn-header-cta {
+            background: var(--grad-btn);
             color: #FFFFFF !important;
-            padding: 9px 20px;
-            border-radius: 8px;
-            font-weight: 600;
+            padding: 10px 22px;
+            border-radius: 40px;
+            font-weight: 700;
             font-size: 14px;
-            transition: all 0.2s ease;
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+            transition: all 0.3s ease;
         }
-        .btn-nav-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
+        .btn-header-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(139, 92, 246, 0.6);
         }
 
-        /* Main 2-Column Split Container */
+        /* Hero Split 2-Column Section */
         .hero-container {
             max-width: 1280px;
             width: 100%;
-            margin: 10px auto 40px;
+            margin: 30px auto 40px;
             padding: 0 32px;
             display: flex;
             align-items: center;
@@ -100,421 +120,450 @@
             flex: 1;
         }
 
-        /* Left Hero Presentation */
+        /* Left Showcase Column */
         .hero-left {
-            flex: 1.35;
-            max-width: 680px;
+            flex: 1.4;
+            max-width: 700px;
         }
 
         .badge-pill {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background: #EEF2FF;
-            color: var(--accent);
-            padding: 6px 14px;
+            gap: 8px;
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.35);
+            padding: 6px 18px;
             border-radius: 100px;
+            color: #C4B5FD;
             font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
             margin-bottom: 20px;
+        }
+        .pulse-dot {
+            width: 8px; height: 8px;
+            background: #10B981;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #10B981;
         }
 
         .hero-title {
             font-family: 'Outfit', sans-serif;
-            font-size: clamp(40px, 4.6vw, 60px);
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: -1.5px;
-            color: var(--primary-dark);
-            margin-bottom: 18px;
+            font-size: clamp(44px, 5.2vw, 68px);
+            font-weight: 900;
+            line-height: 1.08;
+            letter-spacing: -1.8px;
+            color: #FFFFFF;
+            margin-bottom: 20px;
         }
 
-        .highlight-text {
-            background: linear-gradient(135deg, #1C0D5A 0%, #4F46E5 100%);
+        .gradient-text {
+            background: var(--grad-accent);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .hero-description {
-            font-size: 17px;
+            font-size: 18px;
             color: var(--text-muted);
-            line-height: 1.6;
-            margin-bottom: 28px;
-            max-width: 580px;
+            line-height: 1.65;
+            margin-bottom: 32px;
+            max-width: 600px;
         }
 
-        /* Professional Traveler Hero Banner Wrapper */
-        .traveler-banner-wrapper {
+        /* Stunning 3D Traveler Hero Banner Showcase */
+        .traveler-hero-card {
             position: relative;
             width: 100%;
-            height: 310px;
-            background: linear-gradient(135deg, rgba(238, 242, 255, 0.8) 0%, rgba(241, 245, 249, 0.9) 100%);
-            border: 1px solid rgba(79, 70, 229, 0.15);
-            border-radius: 24px;
+            height: 320px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            backdrop-filter: blur(20px);
             display: flex;
             justify-content: center;
             align-items: flex-end;
             overflow: visible;
-            box-shadow: 0 15px 35px rgba(43, 21, 100, 0.05);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
             margin-top: 10px;
         }
 
+        /* Traveler Image (Using traveler_hero.png) */
         .traveler-hero-img {
-            height: 340px;
+            height: 350px;
             object-fit: contain;
-            filter: drop-shadow(0 20px 30px rgba(43, 21, 100, 0.18));
-            margin-bottom: 0;
+            filter: drop-shadow(0 25px 35px rgba(0, 0, 0, 0.6));
             transform: translateY(10px);
+            transition: transform 0.4s ease;
+        }
+        .traveler-hero-card:hover .traveler-hero-img {
+            transform: translateY(0px) scale(1.02);
         }
 
-        /* Floating Badges on Banner */
-        .floating-badge {
+        /* Floating UI Glass Widgets */
+        .glass-widget {
             position: absolute;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            border-radius: 14px;
-            padding: 10px 16px;
+            background: rgba(15, 12, 32, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            padding: 12px 18px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+            gap: 14px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
             z-index: 10;
         }
-        .floating-badge i {
+        .glass-widget i {
             font-size: 20px;
-            color: var(--accent);
-            background: #EEF2FF;
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
+            color: #FFFFFF;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .floating-badge strong {
-            font-size: 13px;
+        .glass-widget.gps i { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
+        .glass-widget.spots i { background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); }
+
+        .glass-widget-title {
+            font-size: 13.5px;
             font-weight: 700;
-            color: var(--primary-dark);
-            display: block;
+            color: #FFFFFF;
         }
-        .floating-badge span {
-            font-size: 11px;
+        .glass-widget-sub {
+            font-size: 11.5px;
             color: var(--text-muted);
         }
 
-        .badge-top-left {
-            top: 20px;
-            left: 20px;
-        }
-        .badge-bottom-right {
-            bottom: 20px;
-            right: 20px;
-        }
+        .widget-top-left { top: -20px; left: -15px; }
+        .widget-bottom-right { bottom: 20px; right: -15px; }
 
-        /* Right Ultra-Clean Auth Card */
-        .auth-card-wrap {
+        /* Right Column Glassmorphic Auth Card */
+        .right-auth-column {
             flex: 1;
-            max-width: 360px;
+            max-width: 380px;
             display: flex;
             flex-direction: column;
             gap: 16px;
         }
 
-        .auth-card {
-            background: #FFFFFF;
-            border: 1px solid var(--border-light);
-            border-radius: 16px;
-            padding: 32px 28px;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+        .auth-glass-card {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 36px 32px 28px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
             text-align: center;
         }
 
-        .auth-card-logo {
-            height: 36px;
+        .auth-brand-logo {
+            height: 42px;
             object-fit: contain;
             margin-bottom: 24px;
+            filter: brightness(0) invert(1);
         }
 
-        .form-field {
-            margin-bottom: 12px;
+        .input-box {
+            margin-bottom: 14px;
         }
-        .form-field input {
+        .input-box input {
             width: 100%;
-            height: 44px;
-            padding: 0 14px;
-            background: #F8FAFC;
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            font-size: 13.5px;
-            color: var(--text-main);
+            height: 46px;
+            padding: 0 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            font-size: 14px;
+            color: #FFFFFF;
             outline: none;
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
         }
-        .form-field input:focus {
-            border-color: var(--accent);
-            background: #FFFFFF;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        .input-box input::placeholder { color: #64748B; }
+        .input-box input:focus {
+            border-color: var(--purple-main);
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
         }
 
-        .btn-auth-primary {
+        .btn-submit-login {
             width: 100%;
-            height: 44px;
-            background: var(--primary);
+            height: 46px;
+            background: var(--grad-btn);
             color: #FFFFFF;
             border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
             margin-top: 8px;
-            transition: background 0.2s ease;
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);
+            transition: all 0.25s ease;
         }
-        .btn-auth-primary:hover {
-            background: var(--primary-dark);
+        .btn-submit-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(139, 92, 246, 0.6);
         }
 
-        .divider {
+        .divider-or {
             display: flex;
             align-items: center;
-            margin: 18px 0;
-            color: #94A3B8;
-            font-size: 11px;
-            font-weight: 600;
+            margin: 20px 0;
+            color: #64748B;
+            font-size: 12px;
+            font-weight: 700;
             letter-spacing: 0.5px;
         }
-        .divider::before, .divider::after {
+        .divider-or::before, .divider-or::after {
             content: "";
             flex: 1;
             height: 1px;
-            background: var(--border-light);
+            background: rgba(255, 255, 255, 0.1);
         }
-        .divider span { padding: 0 12px; }
+        .divider-or span { padding: 0 14px; }
 
-        .btn-auth-guest {
+        .btn-guest-explore {
             width: 100%;
-            height: 42px;
-            background: #F1F5F9;
-            color: var(--text-main);
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            font-size: 13.5px;
-            font-weight: 600;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            font-size: 14.5px;
+            font-weight: 700;
             text-decoration: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            transition: all 0.2s ease;
+            gap: 10px;
+            transition: all 0.25s ease;
         }
-        .btn-auth-guest:hover {
-            background: #E2E8F0;
+        .btn-guest-explore:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .auth-footer-text {
-            font-size: 13px;
+        .signup-text {
+            font-size: 13.5px;
             color: var(--text-muted);
-            margin-top: 16px;
+            margin-top: 18px;
         }
-        .auth-footer-text a {
-            color: var(--accent);
-            font-weight: 600;
+        .signup-text a {
+            color: #C4B5FD;
+            font-weight: 700;
             text-decoration: none;
         }
+        .signup-text a:hover { text-decoration: underline; }
 
-        /* Official Store Badges */
-        .store-section {
+        /* Store Download Badges */
+        .store-badge-section {
             text-align: center;
         }
-        .store-section p {
+        .store-badge-section p {
             font-size: 13px;
             color: var(--text-muted);
             margin-bottom: 10px;
+            font-weight: 600;
         }
-        .store-badges-row {
+        .badges-flex {
             display: flex;
             gap: 10px;
             justify-content: center;
         }
-        .store-badge {
+        .app-badge-btn {
             background: #000000;
             color: #FFFFFF;
-            padding: 7px 14px;
-            border-radius: 8px;
+            padding: 8px 14px;
+            border-radius: 10px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: transform 0.2s ease;
         }
-        .store-badge i { font-size: 20px; }
-        .store-text { text-align: left; line-height: 1.1; }
-        .store-text .caption { font-size: 8px; opacity: 0.75; display: block; text-transform: uppercase; }
-        .store-text .title { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
-        .badge-soon {
-            background: var(--accent);
+        .app-badge-btn:hover { transform: translateY(-2px); }
+        .app-badge-btn i { font-size: 22px; }
+        .app-badge-content { text-align: left; line-height: 1.15; }
+        .app-badge-content .sub { font-size: 8px; text-transform: uppercase; opacity: 0.75; display: block; }
+        .app-badge-content .name { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        
+        .tag-soon {
+            background: var(--purple-main);
             color: #FFFFFF;
-            font-size: 7.5px;
-            font-weight: 700;
-            padding: 1px 5px;
+            font-size: 8px;
+            font-weight: 800;
+            padding: 2px 6px;
             border-radius: 100px;
             text-transform: uppercase;
         }
 
-        .error-message {
+        .err-msg-box {
             margin-top: 10px;
-            padding: 8px;
-            background: #FEF2F2;
-            border: 1px solid #FCA5A5;
-            border-radius: 6px;
-            color: #991B1B;
-            font-size: 12px;
-            font-weight: 500;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            color: #FCA5A5;
+            font-size: 12.5px;
+            font-weight: 600;
         }
 
-        /* Minimal Single-Line Footer */
+        /* Minimal Footer */
         footer {
             max-width: 1280px;
             width: 100%;
             margin: 40px auto 24px;
             padding: 20px 32px 0;
-            border-top: 1px solid var(--border-light);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 12.5px;
+            font-size: 13px;
             color: var(--text-muted);
             flex-wrap: wrap;
             gap: 16px;
         }
-        .footer-nav {
-            display: flex;
-            gap: 24px;
-        }
-        .footer-nav a {
+        .footer-links-row { display: flex; gap: 24px; }
+        .footer-links-row a {
             color: var(--text-muted);
             text-decoration: none;
             transition: color 0.2s ease;
         }
-        .footer-nav a:hover { color: var(--text-main); }
+        .footer-links-row a:hover { color: #FFFFFF; }
 
-        @media (max-width: 900px) {
-            .hero-container { flex-direction: column; gap: 36px; text-align: center; }
+        @media (max-width: 960px) {
+            .hero-container { flex-direction: column; gap: 40px; text-align: center; }
             .hero-left { max-width: 100%; }
             .hero-description { margin-left: auto; margin-right: auto; }
-            .traveler-banner-wrapper { height: 260px; }
-            .traveler-hero-img { height: 280px; }
+            .widget-top-left { left: 10px; }
+            .widget-bottom-right { right: 10px; }
             footer { flex-direction: column; text-align: center; }
         }
     </style>
 </head>
 <body>
 
-    <div class="ambient-glow"></div>
+    <!-- 3D Glowing Ambient Lights -->
+    <div class="mesh-lights">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
 
-    <!-- Header Navigation -->
+    <!-- Floating Top Navbar -->
     <header>
         <a href="/">
             <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="logo-img" onerror="this.src='assets/images/logo.png'">
         </a>
         <nav>
             <a href="/app/">Explore</a>
-            <a href="privacy_policy.html">Privacy</a>
+            <a href="privacy_policy.html">Privacy Policy</a>
             <a href="/admin/">Admin Portal</a>
-            <a href="/app/" class="btn-nav-primary">Open Web App</a>
+            <a href="/app/" class="btn-header-cta"><i class="fa-solid fa-compass"></i> Open Web Social App</a>
         </nav>
     </header>
 
     <!-- Main Hero Split Container -->
     <main class="hero-container">
 
-        <!-- Left Hero Presentation with Traveler Banner -->
+        <!-- Left Column Presentation with 3D Traveler Hero Card -->
         <div class="hero-left">
             <div class="badge-pill">
-                <i class="fa-solid fa-sparkles"></i> Social Travel & Spot Discovery
+                <span class="pulse-dot"></span> NEXT-GEN SOCIAL TRAVEL PLATFORM
             </div>
             <h1 class="hero-title">
-                Uncover secret places & share <br>
-                <span class="highlight-text">travel squad moments.</span>
+                Discover Hidden Places. <br>
+                <span class="gradient-text">Share Squad Stories.</span>
             </h1>
             <p class="hero-description">
-                The location-contextual social platform to discover hidden stays, navigate with offline compass maps, and capture memories with your squad.
+                The location-contextual social platform for discovering secret stays, navigating with offline compass maps, and connecting live with your travel squad.
             </p>
 
-            <!-- Professional Traveler Banner Integration -->
-            <div class="traveler-banner-wrapper">
-                <img src="assets/images/traveler_hero.png" alt="Hidely Explorer" class="traveler-hero-img">
+            <!-- World-Class Traveler Hero Showcase Banner -->
+            <div class="traveler-hero-card">
 
-                <!-- Floating Feature Badges -->
-                <div class="floating-badge badge-top-left">
+                <!-- Floating Glass Widget 1 -->
+                <div class="glass-widget gps widget-top-left">
                     <i class="fa-solid fa-compass"></i>
                     <div>
-                        <strong>Offline GPS Compass</strong>
-                        <span>Turn-by-turn trail map</span>
+                        <div class="glass-widget-title">Offline GPS Trail Map</div>
+                        <div class="glass-widget-sub">Turn-by-turn navigation</div>
                     </div>
                 </div>
 
-                <div class="floating-badge badge-bottom-right">
-                    <i class="fa-solid fa-mountain-sun"></i>
+                <!-- Traveler Photo Cutout (traveler_hero.png) -->
+                <img src="assets/images/traveler_hero.png" alt="Hidely Explorer" class="traveler-hero-img">
+
+                <!-- Floating Glass Widget 2 -->
+                <div class="glass-widget spots widget-bottom-right">
+                    <i class="fa-solid fa-water"></i>
                     <div>
-                        <strong>12,800+ Secret Spots</strong>
-                        <span>Curated by explorers</span>
+                        <div class="glass-widget-title">12,800+ Secret Spots</div>
+                        <div class="glass-widget-sub">Verified by squad explorers</div>
                     </div>
                 </div>
+
             </div>
         </div>
 
-        <!-- Right Clean Auth Card -->
-        <div class="auth-card-wrap">
-            <div class="auth-card">
-                <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="auth-card-logo" onerror="this.src='assets/images/logo.png'">
+        <!-- Right Column Glassmorphic Auth Card -->
+        <div class="right-auth-column">
+            <div class="auth-glass-card">
+                <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="auth-brand-logo" onerror="this.src='assets/images/logo.png'">
 
-                <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-                    <div class="form-field">
-                        <input type="text" id="auth-email" placeholder="Username, email or phone" required>
+                <form id="main-auth-form" onsubmit="handleMainAuth(event)">
+                    <div class="input-box">
+                        <input type="text" id="auth-email" placeholder="Phone number, username or email" required>
                     </div>
-                    <div class="form-field">
+                    <div class="input-box">
                         <input type="password" id="auth-password" placeholder="Password" required>
                     </div>
 
-                    <button type="submit" id="auth-submit-btn" class="btn-auth-primary">
+                    <button type="submit" id="auth-btn-submit" class="btn-submit-login">
                         Log In
                     </button>
                 </form>
 
-                <div id="auth-error-badge" class="error-message" style="display: none;"></div>
+                <div id="auth-err-box" class="err-msg-box" style="display: none;"></div>
 
-                <div class="divider">
+                <div class="divider-or">
                     <span>OR</span>
                 </div>
 
-                <a href="/app/" class="btn-auth-guest">
-                    <i class="fa-solid fa-compass"></i> Explore as Guest
+                <a href="/app/" class="btn-guest-explore">
+                    <i class="fa-solid fa-compass"></i> Explore Feed & Places
                 </a>
 
-                <p class="auth-footer-text">
+                <p class="signup-text">
                     Don't have an account? <a href="/app/">Sign up</a>
                 </p>
             </div>
 
-            <!-- Official Store Badges -->
-            <div class="store-section">
+            <!-- Official Store Download Badges -->
+            <div class="store-badge-section">
                 <p>Get the app</p>
-                <div class="store-badges-row">
-                    <a href="app-release.apk" download class="store-badge">
+                <div class="badges-flex">
+                    <!-- Google Play Store Direct APK -->
+                    <a href="app-release.apk" download class="app-badge-btn">
                         <i class="fa-brands fa-google-play"></i>
-                        <div class="store-text">
-                            <span class="caption">GET IT ON</span>
-                            <span class="title">Google Play</span>
+                        <div class="app-badge-content">
+                            <span class="sub">GET IT ON</span>
+                            <span class="name">Google Play</span>
                         </div>
                     </a>
 
-                    <div class="store-badge" style="opacity: 0.8; cursor: default;">
+                    <!-- Apple App Store (Coming Soon) -->
+                    <div class="app-badge-btn" style="opacity: 0.8; cursor: default;">
                         <i class="fa-brands fa-apple"></i>
-                        <div class="store-text">
-                            <span class="caption">DOWNLOAD ON THE</span>
-                            <span class="title">App Store <span class="badge-soon">Soon</span></span>
+                        <div class="app-badge-content">
+                            <span class="sub">DOWNLOAD ON THE</span>
+                            <span class="name">App Store <span class="tag-soon">Soon</span></span>
                         </div>
                     </div>
                 </div>
@@ -523,27 +572,27 @@
 
     </main>
 
-    <!-- Minimal Single-Line Footer -->
+    <!-- Clean Minimal Footer -->
     <footer>
-        <div class="footer-nav">
-            <a href="/app/">Explore</a>
+        <div class="footer-links-row">
+            <a href="/app/">Explore Feed</a>
             <a href="/admin/">Admin Console</a>
             <a href="privacy_policy.html">Privacy Policy</a>
-            <a href="delete_account.html">Account Deletion</a>
+            <a href="delete_account.html">Delete Account</a>
             <a href="mailto:support@kittuvirusstudio.in">Support</a>
         </div>
         <div>
-            &copy; 2026 HIDELY FROM KITTU VIRUS STUDIO
+            &copy; 2026 HIDELY FROM KITTU VIRUS STUDIO. ALL RIGHTS RESERVED.
         </div>
     </footer>
 
     <script>
-        async function handleAuthSubmit(e) {
+        async function handleMainAuth(e) {
             e.preventDefault();
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value;
-            const errBox = document.getElementById('auth-error-badge');
-            const btn = document.getElementById('auth-submit-btn');
+            const errBox = document.getElementById('auth-err-box');
+            const btn = document.getElementById('auth-btn-submit');
 
             errBox.style.display = 'none';
             btn.disabled = true;
