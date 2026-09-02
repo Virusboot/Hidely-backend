@@ -75,7 +75,7 @@ const activeWebDir = fs.existsSync(websiteDir) ? websiteDir : fs.existsSync(altW
 
 if (activeWebDir) {
   app.use(express.static(activeWebDir));
-  app.get('*', (req, res, next) => {
+  app.get('(.*)', (req, res, next) => {
     if (req.url.startsWith('/api') || req.url.startsWith('/admin') || req.url.startsWith('/uploads')) {
       return next();
     }
