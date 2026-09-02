@@ -32,6 +32,9 @@ if (!fs.existsSync(adminPublicDir)) {
   fs.mkdirSync(adminPublicDir, { recursive: true });
 }
 app.use('/admin', express.static(adminPublicDir));
+app.get(['/admin', '/admin/*'], (req, res) => {
+  res.sendFile(path.join(adminPublicDir, 'index.html'));
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
