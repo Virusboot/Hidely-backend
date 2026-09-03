@@ -9,8 +9,13 @@ exports.getProfile = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    // Ensure gender column exists
+    try {
+      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT ''`);
+    } catch (_) {}
+
     const userResult = await db.query(
-      'SELECT id, name, email, username, pronouns, bio, profile_picture, is_verified FROM users WHERE id = $1',
+      'SELECT id, name, email, username, pronouns, COALESCE(gender, \'\') as gender, bio, profile_picture, is_verified FROM users WHERE id = $1',
       [userId]
     );
 
@@ -48,9 +53,14 @@ exports.getProfile = async (req, res) => {
  */
 exports.updateProfile = async (req, res) => {
   const userId = req.user.id;
-  const { name, username, pronouns, bio } = req.body;
+  const { name, username, pronouns, gender, bio } = req.body;
 
   try {
+    // Ensure gender column exists
+    try {
+      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT ''`);
+    } catch (_) {}
+
     const usernameClean = username ? username.trim().toLowerCase() : null;
 
     // Check if username is already taken by another user
@@ -84,6 +94,11 @@ exports.updateProfile = async (req, res) => {
       params.push(pronouns.trim());
       paramIndex++;
     }
+    if (gender !== undefined) {
+      query += `gender = $${paramIndex}, `;
+      params.push(gender.trim());
+      paramIndex++;
+    }
     if (bio !== undefined) {
       query += `bio = $${paramIndex}, `;
       params.push(bio.trim());
@@ -104,7 +119,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     query = query.slice(0, -2);
-    query += ` WHERE id = $${paramIndex} RETURNING id, name, email, username, pronouns, bio, profile_picture, is_verified`;
+    query += ` WHERE id = $${paramIndex} RETURNING id, name, email, username, pronouns, COALESCE(gender, '') as gender, bio, profile_picture, is_verified`;
     params.push(userId);
 
     const updateResult = await db.query(query, params);

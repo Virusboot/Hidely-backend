@@ -72,13 +72,24 @@ exports.createPost = async (req, res) => {
 
 /**
  * Fetch global feed posts
+ */
+// Ensure database indexes exist for ultra-fast query execution
+db.query(`
+  CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_post_likes_post_user ON post_likes(post_id, user_id);
+  CREATE INDEX IF NOT EXISTS idx_post_bookmarks_post_user ON post_bookmarks(post_id, user_id);
+  CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);
+`).catch(err => console.warn("Index check:", err.message));
+
+/**
  * GET /api/posts/feed
  */
 exports.getFeed = async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user ? req.user.id : null;
+  const limit = Math.min(parseInt(req.query.limit) || 30, 100);
+  const offset = parseInt(req.query.offset) || 0;
 
   try {
-    // Left outer join to check if the current user liked the post
     const feedResult = await db.query(
       `SELECT 
         p.id, 
@@ -92,22 +103,19 @@ exports.getFeed = async (req, res) => {
         u.name AS author_name,
         u.username AS author_username,
         u.profile_picture AS author_profile_picture,
-        COALESCE(
-          (SELECT TRUE FROM post_likes WHERE post_id = p.id AND user_id = $1 LIMIT 1), 
-          FALSE
-        ) AS is_liked,
-        COALESCE(
-          (SELECT TRUE FROM post_bookmarks WHERE post_id = p.id AND user_id = $1 LIMIT 1), 
-          FALSE
-        ) AS is_bookmarked,
-        COALESCE(
-          (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id), 
-          0
-        ) AS comments_count
+        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) AS is_liked,
+        EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) AS is_bookmarked,
+        COALESCE(pc.comments_count, 0) AS comments_count
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
-      ORDER BY p.created_at DESC`,
-      [userId]
+      LEFT JOIN (
+        SELECT post_id, COUNT(*)::int AS comments_count 
+        FROM post_comments 
+        GROUP BY post_id
+      ) pc ON pc.post_id = p.id
+      ORDER BY p.created_at DESC
+      LIMIT $2 OFFSET $3`,
+      [userId, limit, offset]
     );
 
     return res.status(200).json({

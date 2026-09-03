@@ -1,670 +1,121 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <meta name="build-version" content="2026.09.02.1605">
-    <title>Hidely — Social Places Discovery Platform</title>
-    <meta name="description" content="Hidely is the next-gen location-contextual social platform for secret spots discovery, offline compass navigation, and travel squad stories.">
+<!DOCTYPE html><html><head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="shortcut icon" type="image/png" href="favicon.png">
-    <link rel="apple-touch-icon" href="favicon.png">
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
 
-    <!-- Premium Google Fonts: Sora (Headings) & Inter (UI & Body) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
 
-    <style>
-        :root {
-            --bg-page: #FAFAFC;
-            --purple-main: #2B1564;
-            --purple-dark: #1C0D5A;
-            --purple-vivid: #7C3AED;
-            --text-dark: #0F172A;
-            --text-muted: #64748B;
-            --border-light: #E2E8F0;
-            --grad-brand: linear-gradient(135deg, #1C0D5A 0%, #2B1564 45%, #7C3AED 100%);
-            --grad-btn: linear-gradient(135deg, #2B1564 0%, #7C3AED 100%);
-            --font-head: 'Sora', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-body); }
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Hidely is the premier social platform for discovering hidden places and exploring nearby stays.">
+  <title>Hidely — Social Places Discovery</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <!-- Google Maps Web JS SDK -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB5ftUcwqjuC1BZtI26KrZsblQIF1Bl7t0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  <style id="splash-screen-style">
+    html {
+      height: 100%
+    }
 
-        body {
-            background-color: var(--bg-page);
-            color: var(--text-dark);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow-x: hidden;
-            position: relative;
-            -webkit-font-smoothing: antialiased;
-        }
+    body {
+      margin: 0;
+      min-height: 100%;
+      background-color: #ffffff;
+          background-size: 100% 100%;
+    }
 
-        /* Ambient Pastel Aura Lights (App Matched) */
-        .ambient-mesh {
-            position: fixed;
-            inset: 0;
-            z-index: -1;
-            pointer-events: none;
-            overflow: hidden;
-        }
-        .aura {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(140px);
-            opacity: 0.65;
-        }
-        .aura-1 { width: 650px; height: 650px; background: #E0F2FE; top: -150px; left: 5%; }
-        .aura-2 { width: 550px; height: 550px; background: #DDD6FE; top: 250px; right: -100px; }
+    .center {
+      margin: 0;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      -ms-transform: translate(-50%, -50%);
+      transform: translate(-50%, -50%);
+    }
 
-        /* Full Width Flat White Header */
-        header {
-            width: 100%;
-            max-width: 100%;
-            margin: 0;
-            padding: 14px 48px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #FFFFFF;
-            border-bottom: 1px solid var(--border-light);
-            box-shadow: 0 1px 0 rgba(0,0,0,0.04);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .logo-img { height: 40px; object-fit: contain; }
+    .contain {
+      display:block;
+      width:100%; height:100%;
+      object-fit: contain;
+    }
 
-        nav { display: flex; gap: 32px; align-items: center; }
-        nav a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 14.5px;
-            font-weight: 600;
-            transition: color 0.2s ease;
-        }
-        nav a:hover { color: var(--purple-vivid); }
+    .stretch {
+      display:block;
+      width:100%; height:100%;
+    }
 
-        .btn-header-cta {
-            background: var(--grad-btn);
-            color: #FFFFFF !important;
-            padding: 10px 24px;
-            border-radius: 40px;
-            font-weight: 700;
-            font-size: 14px;
-            box-shadow: 0 6px 20px rgba(43, 21, 100, 0.25);
-            transition: all 0.3s ease;
-        }
-        .btn-header-cta:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.4);
-        }
+    .cover {
+      display:block;
+      width:100%; height:100%;
+      object-fit: cover;
+    }
 
-        /* Hero Split 2-Column Section */
-        .hero-container {
-            max-width: 1280px;
-            width: 100%;
-            margin: 45px auto 40px;
-            padding: 0 32px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 60px;
-            flex: 1;
-        }
+    .bottom {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      -ms-transform: translate(-50%, 0);
+      transform: translate(-50%, 0);
+    }
 
-        /* Left Showcase Column */
-        .hero-left {
-            flex: 1.4;
-            max-width: 720px;
-        }
+    .bottomLeft {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+    }
 
-        .badge-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: #F3E8FF;
-            border: 1px solid rgba(124, 58, 237, 0.25);
-            padding: 8px 20px;
-            border-radius: 100px;
-            color: var(--purple-vivid);
-            font-size: 12.5px;
-            font-weight: 700;
-            letter-spacing: 0.6px;
-            text-transform: uppercase;
-            margin-bottom: 24px;
-        }
-        .pulse-dot {
-            width: 8px; height: 8px;
-            background: #10B981;
-            border-radius: 50%;
-            box-shadow: 0 0 10px #10B981;
-        }
-
-        .hero-title {
-            font-family: var(--font-head);
-            font-size: clamp(46px, 5.2vw, 70px);
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: -1.5px;
-            color: var(--purple-dark);
-            margin-bottom: 24px;
-        }
-
-        .gradient-text {
-            background: var(--grad-brand);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hero-description {
-            font-size: 19px;
-            color: var(--text-muted);
-            line-height: 1.65;
-            margin-bottom: 36px;
-            max-width: 620px;
-            font-weight: 500;
-        }
-
-        /* App Store Download Buttons (Left Column) */
-        .hero-store-buttons {
-            display: flex;
-            gap: 16px;
-            margin-top: 10px;
-            flex-wrap: wrap;
-        }
-        .hero-store-btn {
-            padding: 14px 26px;
-            border-radius: 16px;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            transition: all 0.3s ease;
-        }
-        .hero-store-btn.playstore {
-            background: var(--grad-btn);
-            color: #FFFFFF;
-            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.25);
-        }
-        .hero-store-btn.playstore:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 35px rgba(124, 58, 237, 0.4);
-        }
-
-        .hero-store-btn.appstore {
-            background: var(--purple-main);
-            color: #FFFFFF;
-            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.25);
-            cursor: default;
-        }
-
-        .hero-store-btn i { font-size: 28px; }
-        .hero-store-text { text-align: left; line-height: 1.2; }
-        .hero-store-text .caption { font-size: 9.5px; font-weight: 600; text-transform: uppercase; opacity: 0.85; display: block; letter-spacing: 0.5px; }
-        .hero-store-text .title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
-
-        .badge-soon-pill {
-            background: rgba(255, 255, 255, 0.25);
-            color: #FFFFFF;
-            font-size: 8px;
-            font-weight: 800;
-            padding: 2px 7px;
-            border-radius: 100px;
-            text-transform: uppercase;
-        }
-
-        /* Right Column Auth Card (Light App Theme) */
-        .right-auth-column {
-            flex: 1;
-            max-width: 380px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .auth-light-card {
-            background: #FFFFFF;
-            border: 1px solid var(--border-light);
-            border-radius: 24px;
-            padding: 36px 32px 28px;
-            box-shadow: 0 20px 50px rgba(43, 21, 100, 0.08);
-            text-align: center;
-        }
-
-        .auth-brand-logo {
-            height: 44px;
-            object-fit: contain;
-            margin-bottom: 24px;
-        }
-
-        .input-box {
-            margin-bottom: 14px;
-        }
-        .input-box input {
-            width: 100%;
-            height: 46px;
-            padding: 0 16px;
-            background: #F8FAFC;
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            font-size: 14px;
-            color: var(--text-dark);
-            outline: none;
-            transition: all 0.25s ease;
-        }
-        .input-box input::placeholder { color: #94A3B8; }
-        .input-box input:focus {
-            border-color: var(--purple-vivid);
-            background: #FFFFFF;
-            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
-        }
-
-        .btn-submit-login {
-            width: 100%;
-            height: 46px;
-            background: var(--grad-btn);
-            color: #FFFFFF;
-            border: none;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 8px;
-            box-shadow: 0 10px 25px rgba(43, 21, 100, 0.25);
-            transition: all 0.25s ease;
-        }
-        .btn-submit-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 14px 30px rgba(43, 21, 100, 0.4);
-        }
-
-        .divider-or {
-            display: flex;
-            align-items: center;
-            margin: 20px 0;
-            color: #94A3B8;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-        .divider-or::before, .divider-or::after {
-            content: "";
-            flex: 1;
-            height: 1px;
-            background: var(--border-light);
-        }
-        .divider-or span { padding: 0 14px; }
-
-        .btn-guest-explore {
-            width: 100%;
-            height: 44px;
-            background: #F1F5F9;
-            color: var(--text-dark);
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            font-size: 14.5px;
-            font-weight: 700;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: all 0.25s ease;
-        }
-        .btn-guest-explore:hover {
-            background: #E2E8F0;
-        }
-
-        .signup-text {
-            font-size: 13.5px;
-            color: var(--text-muted);
-            margin-top: 18px;
-        }
-        .signup-text a {
-            color: var(--purple-vivid);
-            font-weight: 700;
-            text-decoration: none;
-        }
-        .signup-text a:hover { text-decoration: underline; }
-
-        /* App Store Buttons display logic */
-        .desktop-store-btns { display: flex; }
-        .mobile-store-btns { display: none; margin-top: 20px; }
-
-        .err-msg-box {
-            margin-top: 10px;
-            padding: 10px;
-            background: #FEF2F2;
-            border: 1px solid #FCA5A5;
-            border-radius: 8px;
-            color: #991B1B;
-            font-size: 12.5px;
-            font-weight: 600;
-        }
-
-        /* Clean Minimal Full Width Footer */
-        footer {
-            width: 100%;
-            max-width: 100%;
-            margin: 40px 0 0 0;
-            padding: 20px 48px 24px;
-            background: #FFFFFF;
-            border-top: 1px solid var(--border-light);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-            color: var(--text-muted);
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-        .footer-links-row { display: flex; gap: 24px; }
-        .footer-links-row a {
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: color 0.2s ease;
-        }
-        .footer-links-row a:hover { color: var(--purple-vivid); }
-
-        /* ===== TABLET & MOBILE (≤960px) ===== */
-        @media (max-width: 960px) {
-            header { padding: 12px 24px; }
-            nav { gap: 20px; }
-            nav a:not(.btn-header-cta) { display: none; }
-            .hero-container { flex-direction: column; gap: 32px; text-align: center; padding: 0 24px; margin: 32px auto 28px; }
-            .hero-left { max-width: 100%; }
-            .right-auth-column { max-width: 440px; width: 100%; margin: 0 auto; }
-            .hero-description { margin-left: auto; margin-right: auto; font-size: 16px; }
-            .desktop-store-btns { display: none !important; }
-            .mobile-store-btns { display: flex !important; justify-content: center; }
-            footer { flex-direction: column; text-align: center; gap: 12px; padding: 16px 24px 0; }
-            .footer-links-row { flex-wrap: wrap; justify-content: center; gap: 14px; }
-        }
-
-        /* ===== PHONE (≤600px) ===== */
-        @media (max-width: 600px) {
-            header {
-                width: 100%;
-                padding: 10px 16px;
-                top: 0;
-                border-radius: 0;
-                margin: 0;
-            }
-            .logo-img { height: 32px; }
-            nav { gap: 10px; }
-            nav a:not(.btn-header-cta) { display: none; }
-            .btn-header-cta {
-                padding: 8px 14px;
-                font-size: 12px;
-                white-space: nowrap;
-            }
-            .btn-header-cta i { display: none; }
-
-            .hero-container {
-                padding: 0 16px;
-                margin: 20px auto 20px;
-                gap: 24px;
-            }
-
-            .badge-pill { font-size: 10.5px; padding: 6px 14px; }
-
-            .hero-title {
-                font-size: clamp(32px, 9vw, 46px);
-                letter-spacing: -0.8px;
-                margin-bottom: 16px;
-            }
-
-            .hero-description {
-                font-size: 15px;
-                line-height: 1.6;
-                margin-bottom: 24px;
-            }
-
-            .hero-store-buttons {
-                flex-direction: row;
-                align-items: stretch;
-                justify-content: center;
-                gap: 10px;
-            }
-            .hero-store-btn {
-                flex: 1;
-                max-width: 160px;
-                justify-content: center;
-                padding: 10px 12px;
-                border-radius: 14px;
-                gap: 8px;
-            }
-            .hero-store-btn i { font-size: 22px; }
-            .hero-store-text .title { font-size: 13px; }
-            .hero-store-text .caption { font-size: 8.5px; }
-
-            .right-auth-column {
-                max-width: 100%;
-                width: 100%;
-            }
-
-            .auth-light-card {
-                padding: 28px 20px 22px;
-                border-radius: 20px;
-            }
-
-            .auth-brand-logo { height: 36px; margin-bottom: 18px; }
-
-            .input-box input {
-                height: 48px;
-                font-size: 15px;
-                border-radius: 10px;
-            }
-
-            .btn-submit-login {
-                height: 48px;
-                font-size: 15px;
-                border-radius: 10px;
-            }
-
-            .btn-guest-explore {
-                height: 46px;
-                font-size: 14px;
-                border-radius: 10px;
-            }
-
-            footer {
-                margin: 28px auto 16px;
-                padding: 14px 16px 0;
-                font-size: 12px;
-            }
-            .footer-links-row { gap: 12px; font-size: 12px; }
-
-            .aura-1 { width: 320px; height: 320px; }
-            .aura-2 { width: 280px; height: 280px; }
-        }
-
-        /* ===== VERY SMALL PHONE (≤380px) ===== */
-        @media (max-width: 380px) {
-            .hero-title { font-size: 30px; }
-            .btn-header-cta { padding: 7px 10px; font-size: 11px; }
-            .auth-light-card { padding: 22px 14px 18px; }
-        }
-    </style>
+    .bottomRight {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+    }
+  </style>
+  <script id="splash-screen-script">
+    function removeSplashFromWeb() {
+      document.getElementById("splash")?.remove();
+      document.getElementById("splash-branding")?.remove();
+      document.body.style.background = "transparent";
+    }
+  </script>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
 </head>
 <body>
+  <script src="flutter_bootstrap.js" async=""></script>
 
-    <!-- Ambient Pastel Aura Lights -->
-    <div class="ambient-mesh">
-        <div class="aura aura-1"></div>
-        <div class="aura aura-2"></div>
-    </div>
 
-    <!-- Floating Top Glass Header -->
-    <header>
-        <a href="/">
-            <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="logo-img" onerror="this.src='assets/images/logo.png'">
-        </a>
-        <nav>
-            <a href="/app/">Explore Places</a>
-            <a href="privacy_policy.html">Privacy Policy</a>
-            <a href="/admin/">Admin Portal</a>
-            <a href="/app/" class="btn-header-cta"><i class="fa-solid fa-compass"></i> Open Web Social App</a>
-        </nav>
-    </header>
-
-    <!-- Main Hero Split Container -->
-    <main class="hero-container">
-
-        <!-- Left Column Presentation -->
-        <div class="hero-left">
-            <div class="badge-pill">
-                <span class="pulse-dot"></span> NEXT-GEN SOCIAL TRAVEL PLATFORM
-            </div>
-            <h1 class="hero-title">
-                Discover Hidden Places. <br>
-                <span class="gradient-text">Share Squad Stories.</span>
-            </h1>
-            <p class="hero-description">
-                The location-contextual social platform for discovering secret stays, navigating with offline compass maps, and connecting live with your travel squad.
-            </p>
-
-            <!-- Store buttons: desktop only (hidden on mobile via CSS) -->
-            <div class="hero-store-buttons desktop-store-btns">
-                <a href="app-release.apk" download class="hero-store-btn playstore">
-                    <i class="fa-brands fa-google-play"></i>
-                    <div class="hero-store-text">
-                        <span class="caption">GET IT ON</span>
-                        <span class="title">Google Play</span>
-                    </div>
-                </a>
-                <div class="hero-store-btn appstore">
-                    <i class="fa-brands fa-apple"></i>
-                    <div class="hero-store-text">
-                        <span class="caption">DOWNLOAD ON THE</span>
-                        <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Column Light Auth Card -->
-        <div class="right-auth-column">
-            <div class="auth-light-card">
-                <img src="assets/images/logo_horizontal_color.png" alt="HIDELY" class="auth-brand-logo" onerror="this.src='assets/images/logo.png'">
-
-                <form id="main-auth-form" onsubmit="handleMainAuth(event)">
-                    <div class="input-box">
-                        <input type="text" id="auth-email" placeholder="Phone number, username or email" required>
-                    </div>
-                    <div class="input-box">
-                        <input type="password" id="auth-password" placeholder="Password" required>
-                    </div>
-
-                    <button type="submit" id="auth-btn-submit" class="btn-submit-login">
-                        Log In
-                    </button>
-                </form>
-
-                <div id="auth-err-box" class="err-msg-box" style="display: none;"></div>
-
-                <div class="divider-or">
-                    <span>OR</span>
-                </div>
-
-                <a href="/app/" class="btn-guest-explore">
-                    <i class="fa-solid fa-compass"></i> Explore Feed &amp; Places
-                </a>
-
-                <p class="signup-text">
-                    Don't have an account? <a href="/app/">Sign up</a>
-                </p>
-            </div>
-
-            <!-- Mobile-only store buttons: separate below auth card -->
-            <div class="hero-store-buttons mobile-store-btns">
-                <a href="app-release.apk" download class="hero-store-btn playstore">
-                    <i class="fa-brands fa-google-play"></i>
-                    <div class="hero-store-text">
-                        <span class="caption">GET IT ON</span>
-                        <span class="title">Google Play</span>
-                    </div>
-                </a>
-                <div class="hero-store-btn appstore">
-                    <i class="fa-brands fa-apple"></i>
-                    <div class="hero-store-text">
-                        <span class="caption">DOWNLOAD ON THE</span>
-                        <span class="title">App Store <span class="badge-soon-pill">Soon</span></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Clean Minimal Footer -->
-    <footer>
-        <div class="footer-links-row">
-            <a href="/app/">Explore Feed</a>
-            <a href="/admin/">Admin Console</a>
-            <a href="privacy_policy.html">Privacy Policy</a>
-            <a href="delete_account.html">Delete Account</a>
-            <a href="mailto:support@kittuvirusstudio.in">Support</a>
-        </div>
-        <div>
-            &copy; 2026 HIDELY FROM KITTU VIRUS STUDIO. ALL RIGHTS RESERVED.
-        </div>
-    </footer>
-
-    <script>
-        async function handleMainAuth(e) {
-            e.preventDefault();
-            const email = document.getElementById('auth-email').value.trim();
-            const password = document.getElementById('auth-password').value;
-            const errBox = document.getElementById('auth-err-box');
-            const btn = document.getElementById('auth-btn-submit');
-
-            errBox.style.display = 'none';
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in...';
-
-            try {
-                const res = await fetch('https://hidely-backend.onrender.com/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password }),
-                });
-                const data = await res.json();
-                btn.disabled = false;
-                btn.innerHTML = 'Log In';
-
-                if (!res.ok) {
-                    errBox.textContent = data.error || 'Invalid credentials. Please check your username and password.';
-                    errBox.style.display = 'block';
-                    return;
-                }
-
-                localStorage.setItem('hidely_token', data.token);
-                localStorage.setItem('hidely_user', JSON.stringify(data.user));
-
-                if (data.user && (data.user.is_admin || data.user.email === 'admin@hidely.com')) {
-                    window.location.href = '/admin/';
-                } else {
-                    window.location.href = '/app/';
-                }
-            } catch (err) {
-                btn.disabled = false;
-                btn.innerHTML = 'Log In';
-                errBox.textContent = 'Server connection error. Please try again.';
-                errBox.style.display = 'block';
-            }
-        }
-    </script>
-</body>
-</html>
+</body></html>
