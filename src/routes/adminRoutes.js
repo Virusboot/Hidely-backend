@@ -31,4 +31,8 @@ router.delete('/posts/:id', adminController.deletePost);
 // Broadcast Notifications
 router.post('/broadcast', adminController.broadcastNotification);
 
+// Reward Configuration Management
+router.get('/rewards/config', adminController.getRewardConfig);
+router.put('/rewards/config', adminController.updateRewardConfig);
+
 module.exports = router;

@@ -445,6 +445,35 @@ const broadcastNotification = async (req, res) => {
   }
 };
 
+/**
+ * Get current reward configuration & daily maximum caps
+ * GET /api/admin/rewards/config
+ */
+exports.getRewardConfig = (req, res) => {
+  const rewardService = require('../services/rewardService');
+  return res.json({
+    success: true,
+    config: rewardService.getRewardConfig(),
+  });
+};
+
+/**
+ * Update reward configuration & daily maximum caps
+ * PUT /api/admin/rewards/config
+ */
+exports.updateRewardConfig = (req, res) => {
+  const rewardService = require('../services/rewardService');
+  const success = rewardService.updateRewardConfig(req.body);
+  if (success) {
+    return res.json({
+      success: true,
+      message: 'Reward configuration and maximum caps updated successfully.',
+      config: rewardService.getRewardConfig(),
+    });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid configuration payload.' });
+};
+
 module.exports = {
   loginAdmin,
   getDashboardStats,
@@ -458,4 +487,6 @@ module.exports = {
   getPosts,
   deletePost,
   broadcastNotification,
+  getRewardConfig: exports.getRewardConfig,
+  updateRewardConfig: exports.updateRewardConfig,
 };

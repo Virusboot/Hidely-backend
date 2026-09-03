@@ -7,7 +7,24 @@ const { uploadToCloudinary } = require('../config/cloudinary');
  */
 exports.createPost = async (req, res) => {
   const userId = req.user.id;
-  const { caption, location, category } = req.body;
+  const { 
+    caption, 
+    location, 
+    category,
+    latitude,
+    longitude,
+    location_accuracy_meters,
+    location_source,
+    location_captured_at,
+    canonical_name,
+    normalized_name,
+    landmark_type,
+    city,
+    state,
+    country,
+    ai_confidence,
+    duplicate_cluster_id
+  } = req.body;
 
   if (!req.file) {
     return res.status(400).json({ error: 'Please upload a media file (image or video) for the post.' });
@@ -17,34 +34,141 @@ exports.createPost = async (req, res) => {
     // Upload the file to Cloudinary in the posts folder
     const imageUrl = await uploadToCloudinary(req.file.path, 'hidely/posts');
 
+    // Coordinate & accuracy validation
+    let validLat = null;
+    let validLng = null;
+    let validAccuracy = null;
+    let validSource = null;
+    let validCapturedAt = null;
+
+    if (latitude !== undefined && latitude !== null && latitude !== '') {
+      const parsedLat = parseFloat(latitude);
+      if (!isNaN(parsedLat) && parsedLat >= -90 && parsedLat <= 90) {
+        validLat = parsedLat;
+      }
+    }
+
+    if (longitude !== undefined && longitude !== null && longitude !== '') {
+      const parsedLng = parseFloat(longitude);
+      if (!isNaN(parsedLng) && parsedLng >= -180 && parsedLng <= 180) {
+        validLng = parsedLng;
+      }
+    }
+
+    if (location_accuracy_meters !== undefined && location_accuracy_meters !== null && location_accuracy_meters !== '') {
+      const parsedAcc = parseFloat(location_accuracy_meters);
+      if (!isNaN(parsedAcc) && parsedAcc >= 0) {
+        validAccuracy = parsedAcc;
+      }
+    }
+
+    if (location_source === 'camera_capture' || location_source === 'manual') {
+      validSource = location_source;
+    }
+
+    if (location_captured_at && !isNaN(Date.parse(location_captured_at))) {
+      validCapturedAt = new Date(location_captured_at).toISOString();
+    }
+
+    // Place Identity calculations
+    const cName = canonical_name || location || '';
+    const normName = normalized_name || cName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const parsedAiConfidence = ai_confidence ? parseFloat(ai_confidence) : 0.95;
+    const clusterId = duplicate_cluster_id || (validLat && validLng ? `cluster_${validLat.toFixed(3)}_${validLng.toFixed(3)}` : null);
+
+    // Auto-match or create Master Place in `places` table for grouping all posts under 1 Master Place
+    let masterPlaceId = null;
+    if (cName && cName.trim() !== '' && cName.trim() !== 'Unknown Location') {
+      try {
+        const placeSearch = await db.query(
+          'SELECT id FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1',
+          [cName.trim()]
+        );
+        if (placeSearch.rows.length > 0) {
+          masterPlaceId = placeSearch.rows[0].id;
+        } else {
+          const newPlace = await db.query(
+            `INSERT INTO places (name, description, category, latitude, longitude, rating, image_url, is_featured)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+            [
+              cName.trim(),
+              `Hidden travel location: ${cName.trim()}`,
+              category || 'Nature',
+              validLat || 0.0,
+              validLng || 0.0,
+              4.8,
+              imageUrl,
+              true
+            ]
+          );
+          masterPlaceId = newPlace.rows[0].id;
+        }
+      } catch (err) {
+        console.error('Error auto-linking master place:', err.message || err);
+      }
+    }
+
     const newPostResult = await db.query(
-      'INSERT INTO posts (user_id, caption, image_url, location, category) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [userId, caption || '', imageUrl, location || '', category || '']
+      `INSERT INTO posts 
+       (user_id, caption, image_url, location, category, latitude, longitude, location_accuracy_meters, location_source, location_captured_at, canonical_name, normalized_name, landmark_type, city, state, country, ai_confidence, duplicate_cluster_id, place_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+       RETURNING *`,
+      [
+        userId, 
+        caption || '', 
+        imageUrl, 
+        location || '', 
+        category || '',
+        validLat,
+        validLng,
+        validAccuracy,
+        validSource,
+        validCapturedAt,
+        cName,
+        normName,
+        landmark_type || '',
+        city || '',
+        state || '',
+        country || '',
+        parsedAiConfidence,
+        clusterId,
+        masterPlaceId
+      ]
     );
 
     const post = newPostResult.rows[0];
 
-    // Increment points for the user (+100 points for discovering a place)
-    await db.query('UPDATE users SET points = COALESCE(points, 7120) + 100 WHERE id = $1', [userId]);
+    // Process Server-Side Rewards with Anti-Spam & Duplicate Place safeguards
+    let isNewMasterPlace = false;
+    let isDuplicatePlace = false;
+    if (cName && cName.trim() !== '' && cName.trim() !== 'Unknown Location') {
+      const placeSearch = await db.query('SELECT id FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1', [cName.trim()]);
+      if (placeSearch.rows.length > 0) {
+        isDuplicatePlace = true;
+      } else {
+        isNewMasterPlace = true;
+      }
+    }
+
+    try {
+      const rewardService = require('../services/rewardService');
+      await rewardService.processPostRewards({
+        userId,
+        postId: post.id,
+        isCameraCapture: validSource === 'camera_capture',
+        locationAccuracyMeters: validAccuracy,
+        isNewMasterPlace,
+        isDuplicatePlace,
+      });
+    } catch (rewardErr) {
+      console.error('Error processing post rewards:', rewardErr.message);
+    }
 
     // Fetch creator's name/username
     const authorResult = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
     const authorName = authorResult.rows[0].name || authorResult.rows[0].username;
 
-    // Trigger notification to the author themselves about points earned
-    await db.query(
-      `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        userId,
-        userId,
-        'points_earned',
-        post.id,
-        'You discovered a new place and earned 100 points!'
-      ]
-    );
-
-    // Send notifications to all followers
+    // Send notifications to all followers (excluding author)
     const followers = await db.query('SELECT follower_id FROM user_follows WHERE following_id = $1', [userId]);
     for (const row of followers.rows) {
       await db.query(

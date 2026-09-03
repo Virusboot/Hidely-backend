@@ -1,3 +1,4 @@
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -9,8 +10,13 @@ const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const gamificationRoutes = require('./routes/gamificationRoutes');
+const { initSocket } = require('./socket');
 
 const app = express();
+const server = http.createServer(app);
+const io = initSocket(server);
 const PORT = process.env.PORT || 5050;
 
 // Middleware
@@ -66,6 +72,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/gamification', gamificationRoutes);
 
 // Serve Unified Hidely Web Platform at Root /
 const websiteDir = path.join(__dirname, '../public/website');
@@ -90,7 +98,7 @@ if (activeWebDir) {
 // Start Server & Test Database Connection
 const startServer = async () => {
   // Bind to PORT immediately so Render health checks succeed
-  app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`-----------------------------------------------`);
     console.log(`Hidely backend server is running on port ${PORT}`);
     console.log(`-----------------------------------------------`);
