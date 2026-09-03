@@ -65,5 +65,8 @@ const authOptional = (req, res, next) => {
 };
 
 module.exports = authStrict;
+module.exports.authStrict = authStrict;
+module.exports.verifyToken = authStrict;
+module.exports.authOptional = authOptional;
 module.exports.optional = authOptional;
-
+module.exports.optionalToken = authOptional;
