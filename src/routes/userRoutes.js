@@ -19,7 +19,7 @@ router.post('/follow/:creatorId', authMiddleware, userController.toggleFollow);
 // Get list of followed creators (private)
 router.get('/following', authMiddleware, userController.getFollowing);
 
-// Get leaderboard ranking list (public/optional auth)
-router.get('/leaderboard', authMiddleware.optional, userController.getLeaderboard);
+// Search users by username or name (public/optional auth)
+router.get('/search', authMiddleware.optional, userController.searchUsers);
 
 module.exports = router;

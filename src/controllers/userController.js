@@ -335,3 +335,39 @@ exports.getLeaderboard = async (req, res) => {
     return res.status(500).json({ error: 'Server error fetching leaderboard.' });
   }
 };
+
+/**
+ * Search users by username or name
+ * GET /api/users/search?q=query
+ */
+exports.searchUsers = async (req, res) => {
+  try {
+    const q = req.query.q || req.query.query || '';
+    if (!q.trim()) {
+      return res.status(200).json({ users: [] });
+    }
+
+    const searchTerm = `%${q.trim()}%`;
+    const result = await db.query(
+      `SELECT 
+        id,
+        name,
+        username,
+        profile_picture,
+        bio,
+        is_verified
+      FROM users
+      WHERE (username ILIKE $1 OR name ILIKE $1)
+      ORDER BY id DESC
+      LIMIT 20`,
+      [searchTerm]
+    );
+
+    return res.status(200).json({
+      users: result.rows,
+    });
+  } catch (error) {
+    console.error('Error searching users:', error);
+    return res.status(500).json({ error: 'Server error searching users.' });
+  }
+};
