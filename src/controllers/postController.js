@@ -513,6 +513,56 @@ exports.toggleLikeComment = async (req, res) => {
 };
 
 /**
+ * Delete a comment
+ * DELETE /api/posts/comment/:commentId
+ */
+exports.deleteComment = async (req, res) => {
+  const userId = req.user.id;
+  const commentId = parseInt(req.params.commentId);
+
+  if (isNaN(commentId)) {
+    return res.status(400).json({ error: 'Invalid comment ID.' });
+  }
+
+  try {
+    // 1. Fetch comment & parent post info to verify permission
+    const commentRes = await db.query(
+      `SELECT c.id, c.user_id AS comment_author_id, c.post_id, p.user_id AS post_author_id 
+       FROM post_comments c
+       JOIN posts p ON c.post_id = p.id
+       WHERE c.id = $1`,
+      [commentId]
+    );
+
+    if (commentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Comment not found.' });
+    }
+
+    const comment = commentRes.rows[0];
+
+    // Allow deletion if requester is either comment author OR post owner
+    if (comment.comment_author_id !== userId && comment.post_author_id !== userId) {
+      return res.status(403).json({ error: 'Unauthorized to delete this comment.' });
+    }
+
+    // 2. Delete comment, likes, and notifications
+    await db.query('DELETE FROM post_comment_likes WHERE comment_id = $1', [commentId]);
+    await db.query('DELETE FROM notifications WHERE comment_id = $1', [commentId]);
+    await db.query('DELETE FROM post_comments WHERE id = $1', [commentId]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Comment deleted successfully.',
+      commentId: commentId,
+      postId: comment.post_id
+    });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    return res.status(500).json({ error: 'Server error deleting comment.' });
+  }
+};
+
+/**
  * Get a single post by ID
  * GET /api/posts/:id
  */

@@ -38,6 +38,9 @@ router.post('/:id/comment', authMiddleware, postController.addComment);
 // Toggle comment like status (private)
 router.post('/comment/:commentId/like', authMiddleware, postController.toggleLikeComment);
 
+// Delete a comment (private)
+router.delete('/comment/:commentId', authMiddleware, postController.deleteComment);
+
 // Get all posts of a specific user (public, checks like/bookmark with optional token)
 router.get('/user/:userId', authMiddleware.optional, postController.getUserPosts);
 
