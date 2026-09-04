@@ -32,9 +32,10 @@ function initSocket(server) {
     const userId = socket.userId;
     console.log(`[Socket.IO] User connected: ${userId} (socket ${socket.id})`);
     
-    onlineUsers.set(userId, socket.id);
+    onlineUsers.set(String(userId), socket.id);
+    onlineUsers.set(parseInt(userId), socket.id);
     socket.join(`user_${userId}`);
-    io.emit('presence_update', { userId, status: 'online' });
+    io.emit('presence_update', { userId: String(userId), status: 'online' });
 
     // Join conversation room
     socket.on('join_conversation', async (data) => {
@@ -87,8 +88,9 @@ function initSocket(server) {
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`[Socket.IO] User disconnected: ${userId}`);
-      onlineUsers.delete(userId);
-      io.emit('presence_update', { userId, status: 'offline' });
+      onlineUsers.delete(String(userId));
+      onlineUsers.delete(parseInt(userId));
+      io.emit('presence_update', { userId: String(userId), status: 'offline' });
     });
   });
 
@@ -100,7 +102,8 @@ function getIo() {
 }
 
 function isUserOnline(userId) {
-  return onlineUsers.has(userId);
+  if (!userId) return false;
+  return onlineUsers.has(String(userId)) || onlineUsers.has(parseInt(userId));
 }
 
 module.exports = {

@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { getIo } = require('../socket');
+const { getIo, isUserOnline } = require('../socket');
 const { uploadToCloudinary } = require('../config/cloudinary');
 
 /**
@@ -63,7 +63,17 @@ exports.getConversations = async (req, res) => {
       [userId, isArchivedParam]
     );
 
-    res.json({ success: true, conversations: result.rows });
+    const conversations = result.rows.map((conv) => {
+      if (conv.participants && Array.isArray(conv.participants)) {
+        conv.participants = conv.participants.map((p) => ({
+          ...p,
+          is_online: isUserOnline(p.id),
+        }));
+      }
+      return conv;
+    });
+
+    res.json({ success: true, conversations });
   } catch (err) {
     console.error('Error fetching conversations:', err);
     res.status(500).json({ error: 'Failed to fetch conversations.' });
@@ -241,8 +251,19 @@ exports.sendMessage = async (req, res) => {
 
     // Handle File Upload if present
     if (req.file) {
-      mediaUrl = await uploadToCloudinary(req.file.path, 'hidely/chat');
-      const ext = req.file.path.split('.').last.toLowerCase();
+      try {
+        mediaUrl = await uploadToCloudinary(req.file.path, 'hidely/chat');
+      } catch (err) {
+        console.warn('Cloudinary upload failed, falling back to local upload URL:', err.message);
+        mediaUrl = `/uploads/${req.file.filename}`;
+      }
+      if (!mediaUrl) {
+        mediaUrl = `/uploads/${req.file.filename}`;
+      }
+
+      const fileNameOrPath = req.file.originalname || req.file.filename || req.file.path;
+      const parts = fileNameOrPath.split('.');
+      const ext = parts[parts.length - 1].toLowerCase();
       if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
         mediaType = 'video';
       } else {
@@ -295,17 +316,20 @@ exports.sendMessage = async (req, res) => {
     message.sender_profile_picture = senderResult.rows[0].profile_picture;
     message.reactions = [];
 
-    // Emit Real-time Socket Event
-    const io = getIo();
-    if (io) {
-      io.to(`conversation_${conversationId}`).emit('new_message', message);
-    }
-
-    // Trigger Push Notifications to conversation recipients (excluding sender)
+    // Trigger Push Notifications and Socket Events to conversation recipients (excluding sender)
     const membersResult = await db.query(
       'SELECT user_id, is_muted FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
       [conversationId, userId]
     );
+
+    // Emit Real-time Socket Event
+    const io = getIo();
+    if (io) {
+      io.to(`conversation_${conversationId}`).emit('new_message', message);
+      for (const row of membersResult.rows) {
+        io.to(`user_${row.user_id}`).emit('new_message', message);
+      }
+    }
 
     for (const row of membersResult.rows) {
       if (!row.is_muted) {
