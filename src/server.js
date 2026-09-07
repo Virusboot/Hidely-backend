@@ -1,10 +1,13 @@
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 require('dotenv').config();
 
 const db = require('./config/db');
+const { corsOptions } = require('./config/corsConfig');
+const securityHeaders = require('./middleware/securityHeaders');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
@@ -19,17 +22,32 @@ const server = http.createServer(app);
 const io = initSocket(server);
 const PORT = process.env.PORT || 5050;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Production Startup Environment & Configuration Safety Check
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET) {
+    console.error('FATAL PRODUCTION ERROR: JWT_SECRET environment variable is missing!');
+  }
+  if (!process.env.DATABASE_URL) {
+    console.error('FATAL PRODUCTION ERROR: DATABASE_URL environment variable is missing!');
+  }
+}
 
-// Disable Cache Middleware
-app.use((req, res, next) => {
-  res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  res.header('Expires', '-1');
-  res.header('Pragma', 'no-cache');
-  next();
-});
+// Security Headers, CORS, & HTTP Compression Middleware
+app.use(securityHeaders);
+app.use(cors(corsOptions));
+app.use(compression());
+
+// Body Parsing & Request Size Limits
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Static Asset Cache Options (1 day = 86400s)
+const staticCacheOptions = {
+  maxAge: '1d',
+  setHeaders: (res, filePath) => {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  },
+};
 
 // Serve static uploads folder (profile pictures, posts pictures)
 const fs = require('fs');
@@ -37,15 +55,15 @@ const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-app.use('/uploads', express.static(uploadsDir));
-app.use('/assets', express.static(path.join(__dirname, '../../assets')));
+app.use('/uploads', express.static(uploadsDir, staticCacheOptions));
+app.use('/assets', express.static(path.join(__dirname, '../../assets'), staticCacheOptions));
 
 // Serve Web Admin Dashboard
 const adminPublicDir = path.join(__dirname, '../public/admin');
 if (!fs.existsSync(adminPublicDir)) {
   fs.mkdirSync(adminPublicDir, { recursive: true });
 }
-app.use('/admin', express.static(adminPublicDir));
+app.use('/admin', express.static(adminPublicDir, staticCacheOptions));
 app.get(/^\/admin/, (req, res) => {
   res.sendFile(path.join(adminPublicDir, 'index.html'));
 });
@@ -55,9 +73,17 @@ const flutterAppDir = path.join(__dirname, '../public/app');
 if (!fs.existsSync(flutterAppDir)) {
   fs.mkdirSync(flutterAppDir, { recursive: true });
 }
-app.use('/app', express.static(flutterAppDir));
+app.use('/app', express.static(flutterAppDir, staticCacheOptions));
 app.get(/^\/app/, (req, res) => {
   res.sendFile(path.join(flutterAppDir, 'index.html'));
+});
+
+// Disable Cache Middleware for API requests
+app.use('/api', (req, res, next) => {
+  res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  res.header('Expires', '-1');
+  res.header('Pragma', 'no-cache');
+  next();
 });
 
 // Request logging middleware
@@ -94,6 +120,22 @@ if (activeWebDir) {
     res.json({ message: 'Welcome to the Hidely API Backend & Admin System!', adminDashboard: '/admin' });
   });
 }
+
+// Global Express Error Handling Middleware (Safe production messages)
+app.use((err, req, res, next) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.error(`[Express Error Handler] ${req.method} ${req.url}:`, err.message || err);
+
+  const statusCode = err.status || err.statusCode || (res.statusCode >= 400 ? res.statusCode : 500);
+  const message = isProduction
+    ? (statusCode === 429 ? err.message : 'An error occurred while processing your request.')
+    : (err.message || 'Internal Server Error');
+
+  return res.status(statusCode).json({
+    error: message,
+    ...(isProduction ? {} : { details: err.stack }),
+  });
+});
 
 // Start Server & Test Database Connection
 const startServer = async () => {

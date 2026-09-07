@@ -1,16 +1,15 @@
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 const db = require('./config/db');
+const { JWT_SECRET } = require('./config/jwt');
+const { getSocketCorsConfig } = require('./config/corsConfig');
 
 let io = null;
 const onlineUsers = new Map(); // userId -> socketId
 
 function initSocket(server) {
   io = socketIo(server, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    },
+    cors: getSocketCorsConfig(),
   });
 
   // Socket Authentication Middleware
@@ -20,7 +19,7 @@ function initSocket(server) {
       if (!token) {
         return next(new Error('Authentication token missing'));
       }
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'hidely_secret_key_2026');
+      const decoded = jwt.verify(token, JWT_SECRET);
       socket.userId = decoded.id;
       next();
     } catch (err) {

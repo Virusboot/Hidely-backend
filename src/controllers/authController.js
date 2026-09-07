@@ -2,8 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { sendOTPEmail } = require('../config/email');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'hidely_super_secret_jwt_key_2026';
+const { JWT_SECRET } = require('../config/jwt');
 
 // Helper to generate a 4-digit OTP matching the Flutter UI boxes
 function generateOTP() {
@@ -215,7 +214,6 @@ exports.login = async (req, res) => {
         error: 'Please verify your account first.',
         requiresVerification: true,
         email: user.email,
-        dev_otp: otpCode,
       });
     }
 
@@ -282,7 +280,6 @@ exports.forgotPassword = async (req, res) => {
     return res.status(200).json({
       message: 'Password reset OTP has been generated.',
       email: emailLower,
-      dev_otp: otpCode,
     });
   } catch (error) {
     console.error('Error in forgotPassword:', error);

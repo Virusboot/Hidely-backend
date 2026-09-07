@@ -79,7 +79,7 @@ function getNextLevelThreshold(points) {
 /**
  * Idempotently award points to a user.
  */
-async function awardPoints(userId, eventType, points, refType = null, refId = null, description = '', metadata = {}) {
+async function awardPoints(userId, eventType, points, refType = null, refId = null, description = '', metadata = {}, options = {}) {
   if (!userId || points <= 0) return null;
 
   try {
@@ -140,8 +140,10 @@ async function awardPoints(userId, eventType, points, refType = null, refId = nu
       }
     }
 
-    // 4. Check for special badge unlocks
-    await checkSpecialBadgeEligibility(userId);
+    // 4. Check for special badge unlocks (if not deferred to batch caller)
+    if (!options.skipBadgeCheck) {
+      await checkSpecialBadgeEligibility(userId);
+    }
 
     // 5. Emit real-time Socket.IO update to user's room
     try {
@@ -215,31 +217,35 @@ async function grantBadgeBySlug(userId, badgeSlug, setAsFeaturedIfNone = false) 
 }
 
 /**
- * Check badge criteria for a user.
+ * Check badge criteria for a user (consolidated 1-query execution).
  */
 async function checkSpecialBadgeEligibility(userId) {
+  if (!userId) return;
+
   try {
-    const placeCountRes = await db.query(
-      `SELECT COUNT(*) FROM point_transactions WHERE user_id = $1 AND event_type = 'hidden_place_discovered'`,
+    const countsRes = await db.query(
+      `SELECT 
+         (SELECT COUNT(*)::int FROM point_transactions WHERE user_id = $1 AND event_type = 'hidden_place_discovered') AS hidden_place_count,
+         (SELECT COUNT(*)::int FROM point_transactions WHERE user_id = $1 AND event_type = 'high_accuracy_location') AS accuracy_count,
+         (SELECT COUNT(*)::int FROM posts WHERE user_id = $1) AS post_count`,
       [userId]
     );
-    if (parseInt(placeCountRes.rows[0].count) >= 1) {
+
+    const counts = countsRes.rows[0] || {};
+    const hiddenPlaceCount = parseInt(counts.hidden_place_count || 0);
+    const accuracyCount = parseInt(counts.accuracy_count || 0);
+    const postCount = parseInt(counts.post_count || 0);
+
+    if (hiddenPlaceCount >= 1) {
       await grantBadgeBySlug(userId, 'first_discovery');
     }
-    if (parseInt(placeCountRes.rows[0].count) >= 5) {
+    if (hiddenPlaceCount >= 5) {
       await grantBadgeBySlug(userId, 'hidely_pioneer');
     }
-
-    const accuracyCountRes = await db.query(
-      `SELECT COUNT(*) FROM point_transactions WHERE user_id = $1 AND event_type = 'high_accuracy_location'`,
-      [userId]
-    );
-    if (parseInt(accuracyCountRes.rows[0].count) >= 5) {
+    if (accuracyCount >= 5) {
       await grantBadgeBySlug(userId, 'precision_explorer');
     }
-
-    const postCountRes = await db.query(`SELECT COUNT(*) FROM posts WHERE user_id = $1`, [userId]);
-    if (parseInt(postCountRes.rows[0].count) >= 10) {
+    if (postCount >= 10) {
       await grantBadgeBySlug(userId, 'top_visual_contributor');
     }
   } catch (err) {
@@ -253,49 +259,43 @@ async function checkSpecialBadgeEligibility(userId) {
 async function processPostRewards({ userId, postId, isCameraCapture, locationAccuracyMeters, isNewMasterPlace, isDuplicatePlace }) {
   if (!userId || !postId) return;
 
-  // 1. Normal Contribution Points Check
-  const dailyPostCountRes = await db.query(
-    `SELECT COUNT(*), COALESCE(SUM(points), 0)::int as total_points FROM point_transactions 
-     WHERE user_id = $1 AND event_type = 'quality_post' AND created_at >= NOW() - INTERVAL '24 hours'`,
+  // 1. Single Consolidated 24-Hour Daily Cap Query
+  const dailyCapRes = await db.query(
+    `SELECT 
+       COUNT(*) FILTER (WHERE event_type = 'quality_post')::int AS daily_quality_post_count,
+       COALESCE(SUM(points) FILTER (WHERE event_type = 'quality_post'), 0)::int AS daily_quality_post_points,
+       COALESCE(SUM(points) FILTER (WHERE event_type = 'camera_location_post'), 0)::int AS daily_camera_points,
+       COALESCE(SUM(points) FILTER (WHERE event_type = 'high_accuracy_location'), 0)::int AS daily_accuracy_points
+     FROM point_transactions 
+     WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'`,
     [userId]
   );
-  const dailyPosts = parseInt(dailyPostCountRes.rows[0].count || 0);
-  const dailyNormalPoints = parseInt(dailyPostCountRes.rows[0].total_points || 0);
 
+  const row = dailyCapRes.rows[0] || {};
+  const dailyPosts = parseInt(row.daily_quality_post_count || 0);
+  const dailyNormalPoints = parseInt(row.daily_quality_post_points || 0);
+  const cameraDailyPoints = parseInt(row.daily_camera_points || 0);
+  const accuracyDailyPoints = parseInt(row.daily_accuracy_points || 0);
+
+  // 2. Normal Contribution Points Check
   if (dailyPosts < REWARD_CONFIG.maxDailyRewardedPosts && dailyNormalPoints < REWARD_CONFIG.maxNormalContributionDaily) {
-    await awardPoints(userId, 'quality_post', REWARD_CONFIG.normalContributionPoints, 'post', postId, 'Normal contribution points');
+    await awardPoints(userId, 'quality_post', REWARD_CONFIG.normalContributionPoints, 'post', postId, 'Normal contribution points', {}, { skipBadgeCheck: true });
   }
 
-  // 2. Camera Location Bonus Check
-  if (isCameraCapture) {
-    const cameraBonusDailyRes = await db.query(
-      `SELECT COALESCE(SUM(points), 0)::int as total_points FROM point_transactions 
-       WHERE user_id = $1 AND event_type = 'camera_location_post' AND created_at >= NOW() - INTERVAL '24 hours'`,
-      [userId]
-    );
-    const cameraDailyPoints = parseInt(cameraBonusDailyRes.rows[0].total_points || 0);
-    if (cameraDailyPoints < REWARD_CONFIG.maxCameraBonusDaily) {
-      await awardPoints(userId, 'camera_location_post', REWARD_CONFIG.cameraLocationBonus, 'post', postId, 'Camera location bonus points');
-    }
+  // 3. Camera Location Bonus Check
+  if (isCameraCapture && cameraDailyPoints < REWARD_CONFIG.maxCameraBonusDaily) {
+    await awardPoints(userId, 'camera_location_post', REWARD_CONFIG.cameraLocationBonus, 'post', postId, 'Camera location bonus points', {}, { skipBadgeCheck: true });
   }
 
-  // 3. GPS Accuracy Bonus Check
-  if (locationAccuracyMeters != null && locationAccuracyMeters <= 100) {
-    const accuracyDailyRes = await db.query(
-      `SELECT COALESCE(SUM(points), 0)::int as total_points FROM point_transactions 
-       WHERE user_id = $1 AND event_type = 'high_accuracy_location' AND created_at >= NOW() - INTERVAL '24 hours'`,
-      [userId]
-    );
-    const accuracyDailyPoints = parseInt(accuracyDailyRes.rows[0].total_points || 0);
-    if (accuracyDailyPoints < REWARD_CONFIG.maxGpsAccuracyBonusDaily) {
-      const bonus = locationAccuracyMeters <= 20 ? REWARD_CONFIG.gpsAccuracyBonusHigh : REWARD_CONFIG.gpsAccuracyBonusBase;
-      await awardPoints(userId, 'high_accuracy_location', bonus, 'post', postId, `GPS accuracy bonus (${Math.round(locationAccuracyMeters)}m)`);
-    }
+  // 4. GPS Accuracy Bonus Check
+  if (locationAccuracyMeters != null && locationAccuracyMeters <= 100 && accuracyDailyPoints < REWARD_CONFIG.maxGpsAccuracyBonusDaily) {
+    const bonus = locationAccuracyMeters <= 20 ? REWARD_CONFIG.gpsAccuracyBonusHigh : REWARD_CONFIG.gpsAccuracyBonusBase;
+    await awardPoints(userId, 'high_accuracy_location', bonus, 'post', postId, `GPS accuracy bonus (${Math.round(locationAccuracyMeters)}m)`, {}, { skipBadgeCheck: true });
   }
 
-  // 4. Hidden Place Discovery Reward
+  // 5. Hidden Place Discovery Reward
   if (isNewMasterPlace && !isDuplicatePlace) {
-    await awardPoints(userId, 'hidden_place_discovered', REWARD_CONFIG.hiddenPlaceDiscoveryPoints, 'post', postId, 'Discovered a new genuine Hidden Place!');
+    await awardPoints(userId, 'hidden_place_discovered', REWARD_CONFIG.hiddenPlaceDiscoveryPoints, 'post', postId, 'Discovered a new genuine Hidden Place!', {}, { skipBadgeCheck: true });
     try {
       await createNotification({
         userId: userId,
@@ -307,6 +307,9 @@ async function processPostRewards({ userId, postId, isCameraCapture, locationAcc
       console.error('[RewardService] Discovery notification error:', e.message);
     }
   }
+
+  // 6. Check special badge eligibility once after all post rewards have processed
+  await checkSpecialBadgeEligibility(userId);
 }
 
 /**

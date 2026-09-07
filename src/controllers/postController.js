@@ -166,23 +166,20 @@ exports.createPost = async (req, res) => {
 
     // Fetch creator's name/username
     const authorResult = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
-    const authorName = authorResult.rows[0].name || authorResult.rows[0].username;
+    const authorName = authorResult.rows[0]?.name || authorResult.rows[0]?.username || 'Someone';
 
-    // Send notifications to all followers (excluding author)
-    const followers = await db.query('SELECT follower_id FROM user_follows WHERE following_id = $1', [userId]);
-    for (const row of followers.rows) {
-      await db.query(
-        `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          row.follower_id,
-          userId,
-          'new_post',
-          post.id,
-          `${authorName} posted a new travel post.`
-        ]
-      );
-    }
+    // Send notifications to all followers (excluding author) using a single set-based PostgreSQL query
+    await db.query(
+      `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
+       SELECT follower_id, $1, 'new_post', $2, $3
+       FROM user_follows
+       WHERE following_id = $1 AND follower_id != $1`,
+      [
+        userId,
+        post.id,
+        `${authorName} posted a new travel post.`
+      ]
+    );
 
     return res.status(201).json({
       message: 'Post created successfully.',
@@ -197,13 +194,7 @@ exports.createPost = async (req, res) => {
 /**
  * Fetch global feed posts
  */
-// Ensure database indexes exist for ultra-fast query execution
-db.query(`
-  CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_post_likes_post_user ON post_likes(post_id, user_id);
-  CREATE INDEX IF NOT EXISTS idx_post_bookmarks_post_user ON post_bookmarks(post_id, user_id);
-  CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);
-`).catch(err => console.warn("Index check:", err.message));
+
 
 /**
  * GET /api/posts/feed
@@ -229,14 +220,9 @@ exports.getFeed = async (req, res) => {
         u.profile_picture AS author_profile_picture,
         EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) AS is_liked,
         EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) AS is_bookmarked,
-        COALESCE(pc.comments_count, 0) AS comments_count
+        (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id) AS comments_count
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
-      LEFT JOIN (
-        SELECT post_id, COUNT(*)::int AS comments_count 
-        FROM post_comments 
-        GROUP BY post_id
-      ) pc ON pc.post_id = p.id
       ORDER BY p.created_at DESC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
@@ -741,13 +727,34 @@ exports.getPostById = async (req, res) => {
 
 /**
  * Fetch explore/categories posts with filtering and sorting
- * GET /api/posts/explore
+ * GET /api/posts/explore?category=...&city=...&search=...&sortBy=...&limit=...&offset=...
  */
 exports.getExplorePosts = async (req, res) => {
   const { category, city, search, sortBy } = req.query;
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    let parsedLimit = 50;
+    let parsedOffset = 0;
+
+    if (req.query.limit !== undefined && req.query.limit !== null && String(req.query.limit).trim() !== '') {
+      const rawLimit = String(req.query.limit).trim();
+      const lim = parseInt(rawLimit, 10);
+      if (isNaN(lim) || lim <= 0 || String(lim) !== rawLimit) {
+        return res.status(400).json({ error: 'Invalid limit parameter.' });
+      }
+      parsedLimit = Math.min(lim, 100);
+    }
+
+    if (req.query.offset !== undefined && req.query.offset !== null && String(req.query.offset).trim() !== '') {
+      const rawOffset = String(req.query.offset).trim();
+      const off = parseInt(rawOffset, 10);
+      if (isNaN(off) || off < 0 || String(off) !== rawOffset) {
+        return res.status(400).json({ error: 'Invalid offset parameter.' });
+      }
+      parsedOffset = off;
+    }
+
     let query = `
       SELECT 
         p.id, 
@@ -805,6 +812,12 @@ exports.getExplorePosts = async (req, res) => {
       query += ` ORDER BY p.caption DESC`;
     } else {
       query += ` ORDER BY p.created_at DESC`;
+    }
+
+    if (parsedLimit !== null) {
+      query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      queryParams.push(parsedLimit, parsedOffset);
+      paramIndex += 2;
     }
 
     const result = await db.query(query, queryParams);

@@ -14,52 +14,69 @@ exports.getConversations = async (req, res) => {
     const isArchivedParam = archived === 'true';
 
     const result = await db.query(
-      `SELECT 
-        c.id,
-        c.type,
-        c.name,
-        c.created_at,
-        c.updated_at,
-        cm.is_pinned,
-        cm.is_muted,
-        cm.is_archived,
-        cm.last_read_message_id,
-        (
-          SELECT json_build_object(
-            'id', m.id,
-            'text', m.text,
-            'type', m.type,
-            'sender_id', m.sender_id,
-            'created_at', m.created_at
-          )
-          FROM messages m
-          WHERE m.conversation_id = c.id
-          ORDER BY m.created_at DESC
-          LIMIT 1
-        ) AS last_message,
-        (
-          SELECT COUNT(*)::int
-          FROM messages m
-          WHERE m.conversation_id = c.id
-            AND m.id > cm.last_read_message_id
-            AND m.sender_id != $1
-        ) AS unread_count,
-        (
-          SELECT json_agg(json_build_object(
-            'id', u.id,
-            'name', u.name,
-            'username', u.username,
-            'profile_picture', u.profile_picture,
-            'is_verified', COALESCE(u.is_verified, false)
-          ))
-          FROM conversation_members cm2
-          JOIN users u ON cm2.user_id = u.id
-          WHERE cm2.conversation_id = c.id AND cm2.user_id != $1
-        ) AS participants
-       FROM conversations c
-       JOIN conversation_members cm ON c.id = cm.conversation_id
-       WHERE cm.user_id = $1 AND cm.is_archived = $2
-       ORDER BY cm.is_pinned DESC, c.updated_at DESC`,
+      `WITH target_conversations AS (
+        SELECT 
+          c.id,
+          c.type,
+          c.name,
+          c.created_at,
+          c.updated_at,
+          cm.is_pinned,
+          cm.is_muted,
+          cm.is_archived,
+          cm.last_read_message_id
+        FROM conversations c
+        JOIN conversation_members cm ON c.id = cm.conversation_id
+        WHERE cm.user_id = $1 AND cm.is_archived = $2
+        ORDER BY cm.is_pinned DESC, c.updated_at DESC
+      )
+      SELECT 
+        tc.id,
+        tc.type,
+        tc.name,
+        tc.created_at,
+        tc.updated_at,
+        tc.is_pinned,
+        tc.is_muted,
+        tc.is_archived,
+        tc.last_read_message_id,
+        lm.last_message,
+        COALESCE(unr.unread_count, 0)::int AS unread_count,
+        part.participants
+      FROM target_conversations tc
+      LEFT JOIN LATERAL (
+        SELECT json_build_object(
+          'id', m.id,
+          'text', m.text,
+          'type', m.type,
+          'sender_id', m.sender_id,
+          'created_at', m.created_at
+        ) AS last_message
+        FROM messages m
+        WHERE m.conversation_id = tc.id
+        ORDER BY m.created_at DESC
+        LIMIT 1
+      ) lm ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS unread_count
+        FROM messages m
+        WHERE m.conversation_id = tc.id
+          AND m.id > tc.last_read_message_id
+          AND m.sender_id != $1
+      ) unr ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object(
+          'id', u.id,
+          'name', u.name,
+          'username', u.username,
+          'profile_picture', u.profile_picture,
+          'is_verified', COALESCE(u.is_verified, false)
+        )) AS participants
+        FROM conversation_members cm2
+        JOIN users u ON cm2.user_id = u.id
+        WHERE cm2.conversation_id = tc.id AND cm2.user_id != $1
+      ) part ON TRUE
+      ORDER BY tc.is_pinned DESC, tc.updated_at DESC`,
       [userId, isArchivedParam]
     );
 
@@ -158,57 +175,77 @@ exports.getMessages = async (req, res) => {
     }
 
     const messagesResult = await db.query(
-      `SELECT 
-        m.id,
-        m.conversation_id,
-        m.sender_id,
-        m.type,
-        m.text,
-        m.reply_to_message_id,
-        m.shared_entity_type,
-        m.shared_entity_id,
-        m.latitude,
-        m.longitude,
-        m.created_at,
-        m.deleted_at,
+      `WITH target_messages AS (
+        SELECT 
+          m.id,
+          m.conversation_id,
+          m.sender_id,
+          m.type,
+          m.text,
+          m.reply_to_message_id,
+          m.shared_entity_type,
+          m.shared_entity_id,
+          m.latitude,
+          m.longitude,
+          m.created_at,
+          m.deleted_at
+        FROM messages m
+        WHERE m.conversation_id = $1
+        ORDER BY m.created_at ASC
+        LIMIT $2
+      )
+      SELECT 
+        tm.id,
+        tm.conversation_id,
+        tm.sender_id,
+        tm.type,
+        tm.text,
+        tm.reply_to_message_id,
+        tm.shared_entity_type,
+        tm.shared_entity_id,
+        tm.latitude,
+        tm.longitude,
+        tm.created_at,
+        tm.deleted_at,
         u.name AS sender_name,
         u.username AS sender_username,
         u.profile_picture AS sender_profile_picture,
-        (
-          SELECT json_agg(json_build_object(
-            'id', ma.id,
-            'type', ma.type,
-            'url', ma.url,
-            'thumbnail_url', ma.thumbnail_url,
-            'duration', ma.duration
-          ))
-          FROM message_attachments ma
-          WHERE ma.message_id = m.id
-        ) AS attachments,
-        (
-          SELECT json_agg(json_build_object(
-            'user_id', mr.user_id,
-            'emoji', mr.emoji
-          ))
-          FROM message_reactions mr
-          WHERE mr.message_id = m.id
-        ) AS reactions,
-        (
-          SELECT json_build_object(
-            'id', rm.id,
-            'text', rm.text,
-            'sender_id', rm.sender_id,
-            'sender_name', ru.name
-          )
-          FROM messages rm
-          LEFT JOIN users ru ON rm.sender_id = ru.id
-          WHERE rm.id = m.reply_to_message_id
+        att.attachments,
+        react.reactions,
+        rep.reply_to_message
+      FROM target_messages tm
+      LEFT JOIN users u ON tm.sender_id = u.id
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object(
+          'id', ma.id,
+          'type', ma.type,
+          'url', ma.url,
+          'thumbnail_url', ma.thumbnail_url,
+          'duration', ma.duration
+        )) AS attachments
+        FROM message_attachments ma
+        WHERE ma.message_id = tm.id
+      ) att ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object(
+          'user_id', mr.user_id,
+          'emoji', mr.emoji
+        )) AS reactions
+        FROM message_reactions mr
+        WHERE mr.message_id = tm.id
+      ) react ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT json_build_object(
+          'id', rm.id,
+          'text', rm.text,
+          'sender_id', rm.sender_id,
+          'sender_name', ru.name
         ) AS reply_to_message
-       FROM messages m
-       LEFT JOIN users u ON m.sender_id = u.id
-       WHERE m.conversation_id = $1
-       ORDER BY m.created_at ASC
-       LIMIT $2`,
+        FROM messages rm
+        LEFT JOIN users ru ON rm.sender_id = ru.id
+        WHERE rm.id = tm.reply_to_message_id
+      ) rep ON TRUE
+      ORDER BY tm.created_at ASC`,
       [conversationId, limit]
     );
 
@@ -236,20 +273,25 @@ exports.sendMessage = async (req, res) => {
     longitude
   } = req.body;
 
+  let client;
   try {
+    client = await db.pool.connect();
+
     // Verify membership
-    const memberCheck = await db.query(
+    const memberCheck = await client.query(
       'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
       [conversationId, userId]
     );
     if (memberCheck.rows.length === 0) {
+      client.release();
+      client = null;
       return res.status(403).json({ error: 'Not authorized to post in this conversation.' });
     }
 
     let mediaUrl = null;
     let mediaType = type;
 
-    // Handle File Upload if present
+    // Handle File Upload if present (performed before transaction BEGIN)
     if (req.file) {
       try {
         mediaUrl = await uploadToCloudinary(req.file.path, 'hidely/chat');
@@ -271,8 +313,11 @@ exports.sendMessage = async (req, res) => {
       }
     }
 
+    // Begin transaction for atomic writes
+    await client.query('BEGIN');
+
     // Insert Message
-    const msgResult = await db.query(
+    const msgResult = await client.query(
       `INSERT INTO messages 
        (conversation_id, sender_id, type, text, reply_to_message_id, shared_entity_type, shared_entity_id, latitude, longitude)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -294,7 +339,7 @@ exports.sendMessage = async (req, res) => {
 
     // Insert Media Attachment if present
     if (mediaUrl) {
-      const attResult = await db.query(
+      const attResult = await client.query(
         `INSERT INTO message_attachments (message_id, type, url) VALUES ($1, $2, $3) RETURNING *`,
         [message.id, mediaType, mediaUrl]
       );
@@ -304,25 +349,39 @@ exports.sendMessage = async (req, res) => {
     }
 
     // Update conversation timestamp
-    await db.query(
+    await client.query(
       'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP, last_message_id = $1 WHERE id = $2',
       [message.id, conversationId]
     );
 
-    // Fetch Sender Info
-    const senderResult = await db.query('SELECT name, username, profile_picture FROM users WHERE id = $1', [userId]);
-    message.sender_name = senderResult.rows[0].name;
-    message.sender_username = senderResult.rows[0].username;
-    message.sender_profile_picture = senderResult.rows[0].profile_picture;
+    // Insert notifications for all unmuted conversation members (excluding sender) using single set-based query
+    const notificationText = text ? text.substring(0, 80) : 'Sent a media message';
+    await client.query(
+      `INSERT INTO notifications (user_id, actor_id, type, text)
+       SELECT user_id, $1, 'message', $2
+       FROM conversation_members
+       WHERE conversation_id = $3 AND user_id != $1 AND (is_muted IS FALSE OR is_muted IS NULL)`,
+      [userId, notificationText, conversationId]
+    );
+
+    // Fetch Sender Info & recipient members inside transaction
+    const senderResult = await client.query('SELECT name, username, profile_picture FROM users WHERE id = $1', [userId]);
+    message.sender_name = senderResult.rows[0] ? senderResult.rows[0].name : '';
+    message.sender_username = senderResult.rows[0] ? senderResult.rows[0].username : '';
+    message.sender_profile_picture = senderResult.rows[0] ? senderResult.rows[0].profile_picture : null;
     message.reactions = [];
 
-    // Trigger Push Notifications and Socket Events to conversation recipients (excluding sender)
-    const membersResult = await db.query(
+    const membersResult = await client.query(
       'SELECT user_id, is_muted FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
       [conversationId, userId]
     );
 
-    // Emit Real-time Socket Event
+    // Commit Transaction
+    await client.query('COMMIT');
+    client.release();
+    client = null;
+
+    // Emit Real-time Socket Event (after successful commit)
     const io = getIo();
     if (io) {
       io.to(`conversation_${conversationId}`).emit('new_message', message);
@@ -331,19 +390,21 @@ exports.sendMessage = async (req, res) => {
       }
     }
 
-    for (const row of membersResult.rows) {
-      if (!row.is_muted) {
-        await db.query(
-          `INSERT INTO notifications (user_id, actor_id, type, text) VALUES ($1, $2, 'message', $3)`,
-          [row.user_id, userId, text ? text.substring(0, 80) : 'Sent a media message']
-        );
+    return res.status(201).json({ success: true, message });
+  } catch (err) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        console.error('Rollback error in sendMessage:', rollbackErr.message);
       }
     }
-
-    res.status(201).json({ success: true, message });
-  } catch (err) {
     console.error('Error sending message:', err);
-    res.status(500).json({ error: 'Failed to send message.' });
+    return res.status(500).json({ error: 'Failed to send message.' });
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 };
 

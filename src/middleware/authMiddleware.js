@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'hidely_super_secret_jwt_key_2026';
+const { JWT_SECRET } = require('../config/jwt');
 
 const authStrict = (req, res, next) => {
   // Get token from header
@@ -17,12 +16,6 @@ const authStrict = (req, res, next) => {
   }
 
   const token = parts[1];
-
-  // Admin Mock Bypass
-  if (token === 'admin_official_token') {
-    req.user = { id: 1, username: 'hidely_official', role: 'admin' };
-    return next();
-  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -48,12 +41,6 @@ const authOptional = (req, res, next) => {
   }
 
   const token = parts[1];
-
-  // Admin Mock Bypass
-  if (token === 'admin_official_token') {
-    req.user = { id: 1, username: 'hidely_official', role: 'admin' };
-    return next();
-  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);

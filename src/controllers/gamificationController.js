@@ -2,7 +2,7 @@ const db = require('../config/db');
 const rewardService = require('../services/rewardService');
 
 /**
- * GET /api/gamification/leaderboard?period=weekly|monthly|all_time
+ * GET /api/gamification/leaderboard?period=weekly|monthly|all_time&limit=100&offset=0
  */
 exports.getLeaderboard = async (req, res) => {
   try {
@@ -13,6 +13,26 @@ exports.getLeaderboard = async (req, res) => {
       timeClause = `WHERE pt.created_at >= NOW() - INTERVAL '7 days'`;
     } else if (period === 'monthly') {
       timeClause = `WHERE pt.created_at >= NOW() - INTERVAL '30 days'`;
+    }
+
+    let parsedLimit = 100;
+    if (req.query.limit !== undefined && req.query.limit !== null && String(req.query.limit).trim() !== '') {
+      const rawLimit = String(req.query.limit).trim();
+      const lim = parseInt(rawLimit, 10);
+      if (isNaN(lim) || lim <= 0 || String(lim) !== rawLimit) {
+        return res.status(400).json({ success: false, error: 'Invalid limit parameter.' });
+      }
+      parsedLimit = Math.min(lim, 100);
+    }
+
+    let parsedOffset = 0;
+    if (req.query.offset !== undefined && req.query.offset !== null && String(req.query.offset).trim() !== '') {
+      const rawOffset = String(req.query.offset).trim();
+      const off = parseInt(rawOffset, 10);
+      if (isNaN(off) || off < 0 || String(off) !== rawOffset) {
+        return res.status(400).json({ success: false, error: 'Invalid offset parameter.' });
+      }
+      parsedOffset = off;
     }
 
     let query = '';
@@ -36,7 +56,7 @@ exports.getLeaderboard = async (req, res) => {
         LEFT JOIN badges b ON b.id = u.featured_badge_id
         WHERE u.username IS NOT NULL AND u.username != ''
         ORDER BY u.total_points DESC, u.explorer_score DESC, u.id ASC
-        LIMIT 100
+        LIMIT $1 OFFSET $2
       `;
     } else {
       query = `
@@ -61,16 +81,16 @@ exports.getLeaderboard = async (req, res) => {
         WHERE u.username IS NOT NULL AND u.username != ''
         GROUP BY u.id, b.id
         ORDER BY points DESC, u.explorer_score DESC, u.id ASC
-        LIMIT 100
+        LIMIT $1 OFFSET $2
       `;
     }
 
-    const result = await db.query(query);
+    const result = await db.query(query, [parsedLimit, parsedOffset]);
     const rows = result.rows;
 
     // Attach level metadata & calculate rank numbers
     const leaderboard = rows.map((row, index) => {
-      const rank = index + 1;
+      const rank = parsedOffset + index + 1;
       const levelInfo = rewardService.calculateLevel(row.points);
       return {
         rank,

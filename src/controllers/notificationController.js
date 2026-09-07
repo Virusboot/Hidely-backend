@@ -1,14 +1,6 @@
 const db = require('../config/db');
 
-// Ensure DB indexes for notifications query optimization
-(async () => {
-  try {
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC)`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read)`);
-  } catch (err) {
-    console.error('Error creating notifications table indexes:', err);
-  }
-})();
+
 
 /**
  * Fetch notifications for the current user (paginated)

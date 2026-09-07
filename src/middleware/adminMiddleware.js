@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'hidely_super_secret_jwt_key_2026';
+const { JWT_SECRET } = require('../config/jwt');
 
 const adminMiddleware = async (req, res, next) => {
   const authHeader = req.header('Authorization');
@@ -30,8 +29,8 @@ const adminMiddleware = async (req, res, next) => {
 
     const user = userRes.rows[0];
     
-    // Check if user is admin or if email is default admin
-    if (!user.is_admin && user.email !== 'admin@hidely.com' && user.username !== 'admin') {
+    // Strict Database RBAC: Require is_admin === true
+    if (!user.is_admin) {
       return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
     }
 

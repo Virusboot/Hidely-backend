@@ -9,13 +9,22 @@ exports.getProfile = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Ensure gender column exists
-    try {
-      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT ''`);
-    } catch (_) {}
-
     const userResult = await db.query(
-      'SELECT id, name, email, username, pronouns, COALESCE(gender, \'\') as gender, bio, profile_picture, is_verified FROM users WHERE id = $1',
+      `SELECT 
+        u.id, 
+        u.name, 
+        u.email, 
+        u.username, 
+        u.pronouns, 
+        COALESCE(u.gender, '') AS gender, 
+        u.bio, 
+        u.profile_picture, 
+        u.is_verified,
+        (SELECT COUNT(*)::int FROM posts WHERE user_id = u.id) AS posts_count,
+        (SELECT COUNT(*)::int FROM user_follows WHERE following_id = u.id) AS followers_count,
+        (SELECT COUNT(*)::int FROM user_follows WHERE follower_id = u.id) AS followings_count
+       FROM users u
+       WHERE u.id = $1`,
       [userId]
     );
 
@@ -23,22 +32,22 @@ exports.getProfile = async (req, res) => {
       return res.status(404).json({ error: 'User profile not found.' });
     }
 
-    const user = userResult.rows[0];
-
-    // Get live post count from DB
-    const postsCountResult = await db.query('SELECT COUNT(*) FROM posts WHERE user_id = $1', [userId]);
-    const postsCount = parseInt(postsCountResult.rows[0].count);
-
-    // Get live follower/following count from DB
-    const followersResult = await db.query('SELECT COUNT(*)::int FROM user_follows WHERE following_id = $1', [userId]);
-    const followingsResult = await db.query('SELECT COUNT(*)::int FROM user_follows WHERE follower_id = $1', [userId]);
+    const row = userResult.rows[0];
 
     return res.status(200).json({
       user: {
-        ...user,
-        posts_count: postsCount,
-        followers_count: followersResult.rows[0].count || 0,
-        followings_count: followingsResult.rows[0].count || 0,
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        username: row.username,
+        pronouns: row.pronouns,
+        gender: row.gender,
+        bio: row.bio,
+        profile_picture: row.profile_picture,
+        is_verified: row.is_verified,
+        posts_count: parseInt(row.posts_count || 0),
+        followers_count: parseInt(row.followers_count || 0),
+        followings_count: parseInt(row.followings_count || 0),
       },
     });
   } catch (error) {
@@ -56,11 +65,6 @@ exports.updateProfile = async (req, res) => {
   const { name, username, pronouns, gender, bio } = req.body;
 
   try {
-    // Ensure gender column exists
-    try {
-      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT ''`);
-    } catch (_) {}
-
     const usernameClean = username ? username.trim().toLowerCase() : null;
 
     // Check if username is already taken by another user
@@ -143,16 +147,32 @@ exports.getCreatorProfile = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
-    const userResult = await db.query(
-      'SELECT id, name, username, pronouns, bio, profile_picture, is_verified FROM users WHERE username = $1',
-      [username.trim().toLowerCase()]
+    const creatorResult = await db.query(
+      `SELECT 
+        u.id, 
+        u.name, 
+        u.username, 
+        u.pronouns, 
+        u.bio, 
+        u.profile_picture, 
+        u.is_verified,
+        (SELECT COUNT(*)::int FROM posts WHERE user_id = u.id) AS posts_count,
+        (SELECT COUNT(*)::int FROM user_follows WHERE following_id = u.id) AS followers_count,
+        (SELECT COUNT(*)::int FROM user_follows WHERE follower_id = u.id) AS followings_count,
+        COALESCE(
+          (SELECT TRUE FROM user_follows WHERE follower_id = $2 AND following_id = u.id LIMIT 1),
+          FALSE
+        ) AS is_following
+       FROM users u
+       WHERE u.username = $1`,
+      [username.trim().toLowerCase(), currentUserId]
     );
 
-    if (userResult.rows.length === 0) {
+    if (creatorResult.rows.length === 0) {
       return res.status(404).json({ error: 'Creator not found.' });
     }
 
-    const creator = userResult.rows[0];
+    const creatorRow = creatorResult.rows[0];
 
     // Get posts of this creator
     const postsResult = await db.query(
@@ -179,28 +199,22 @@ exports.getCreatorProfile = async (req, res) => {
       FROM posts p
       WHERE p.user_id = $1 
       ORDER BY p.created_at DESC`,
-      [creator.id, currentUserId]
+      [creatorRow.id, currentUserId]
     );
-
-    const postsCount = postsResult.rows.length;
-
-    // Get followers/following
-    const followersResult = await db.query('SELECT COUNT(*)::int FROM user_follows WHERE following_id = $1', [creator.id]);
-    const followingsResult = await db.query('SELECT COUNT(*)::int FROM user_follows WHERE follower_id = $1', [creator.id]);
-    
-    let isFollowing = false;
-    if (currentUserId) {
-      const followCheck = await db.query('SELECT * FROM user_follows WHERE follower_id = $1 AND following_id = $2', [currentUserId, creator.id]);
-      isFollowing = followCheck.rows.length > 0;
-    }
 
     return res.status(200).json({
       creator: {
-        ...creator,
-        posts_count: postsCount,
-        followers_count: followersResult.rows[0].count || 0,
-        followings_count: followingsResult.rows[0].count || 0,
-        is_following: isFollowing,
+        id: creatorRow.id,
+        name: creatorRow.name,
+        username: creatorRow.username,
+        pronouns: creatorRow.pronouns,
+        bio: creatorRow.bio,
+        profile_picture: creatorRow.profile_picture,
+        is_verified: creatorRow.is_verified,
+        posts_count: parseInt(creatorRow.posts_count || 0),
+        followers_count: parseInt(creatorRow.followers_count || 0),
+        followings_count: parseInt(creatorRow.followings_count || 0),
+        is_following: creatorRow.is_following === true,
       },
       posts: postsResult.rows,
     });

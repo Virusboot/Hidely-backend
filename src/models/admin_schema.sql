@@ -8,8 +8,8 @@ BEGIN
     END IF;
 END $$;
 
--- Make sure admin user has is_admin = true
-UPDATE users SET is_admin = TRUE WHERE email = 'admin@hidely.com' OR username = 'admin';
+-- Make sure seed admin user has is_admin = true
+UPDATE users SET is_admin = TRUE WHERE email = 'admin@hidely.com';
 
 -- 2. Create places table for curated hidden spots
 CREATE TABLE IF NOT EXISTS places (

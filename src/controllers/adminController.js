@@ -1,8 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'hidely_super_secret_jwt_key_2026';
+const { JWT_SECRET } = require('../config/jwt');
 
 /**
  * Admin Login
@@ -15,48 +14,14 @@ const loginAdmin = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    // Default master admin fallback check for easy onboarding
-    if ((email.trim() === 'admin@hidely.com' || email.trim() === 'admin') && password === 'admin123') {
-      let adminRes = await db.query('SELECT * FROM users WHERE email = $1 OR username = $2', ['admin@hidely.com', 'admin']);
-      let adminUser;
+    const inputClean = email.toLowerCase().trim();
 
-      if (adminRes.rows.length === 0) {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
-        const newAdmin = await db.query(
-          `INSERT INTO users (name, email, password_hash, username, points, is_verified, is_admin)
-           VALUES ($1, $2, $3, $4, 10000, true, true)
-           RETURNING id, name, email, username, is_admin`,
-          ['Admin User', 'admin@hidely.com', hashedPassword, 'admin']
-        );
-        adminUser = newAdmin.rows[0];
-      } else {
-        adminUser = adminRes.rows[0];
-        if (!adminUser.is_admin) {
-          await db.query('UPDATE users SET is_admin = true WHERE id = $1', [adminUser.id]);
-          adminUser.is_admin = true;
-        }
-      }
+    // Database lookup for admin user (must have is_admin = true)
+    const userRes = await db.query(
+      'SELECT * FROM users WHERE (email = $1 OR username = $1) AND is_admin = true',
+      [inputClean]
+    );
 
-      const token = jwt.sign(
-        { id: adminUser.id, email: adminUser.email, username: adminUser.username, isAdmin: true },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      return res.json({
-        message: 'Admin login successful',
-        token,
-        admin: {
-          id: adminUser.id,
-          name: adminUser.name,
-          email: adminUser.email,
-          username: adminUser.username,
-        },
-      });
-    }
-
-    // Database lookup for admin user
-    const userRes = await db.query('SELECT * FROM users WHERE email = $1 OR username = $1', [email.trim()]);
     if (userRes.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid admin credentials.' });
     }
@@ -65,10 +30,6 @@ const loginAdmin = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid admin credentials.' });
-    }
-
-    if (!user.is_admin && user.email !== 'admin@hidely.com') {
-      return res.status(403).json({ error: 'Access denied. Account does not have admin permissions.' });
     }
 
     const token = jwt.sign(
@@ -421,24 +382,23 @@ const deletePost = async (req, res) => {
 const broadcastNotification = async (req, res) => {
   try {
     const { text, type } = req.body;
-    if (!text || text.trim().isEmpty) {
+    if (!text || !text.trim()) {
       return res.status(400).json({ error: 'Notification message text is required.' });
     }
 
-    // Insert broadcast notification for all users
-    const usersRes = await db.query('SELECT id FROM users');
     const adminId = req.admin ? req.admin.id : 1;
     const notificationType = type || 'system_announcement';
 
-    for (const u of usersRes.rows) {
-      await db.query(
-        `INSERT INTO notifications (user_id, actor_id, type, text, is_read)
-         VALUES ($1, $2, $3, $4, false)`,
-        [u.id, adminId, notificationType, text.trim()]
-      );
-    }
+    // Insert broadcast notification for all users using a single set-based PostgreSQL statement
+    const insertRes = await db.query(
+      `INSERT INTO notifications (user_id, actor_id, type, text, is_read)
+       SELECT id, $1, $2, $3, false
+       FROM users
+       RETURNING id`,
+      [adminId, notificationType, text.trim()]
+    );
 
-    return res.json({ message: `Broadcast sent to ${usersRes.rows.length} users successfully.` });
+    return res.json({ message: `Broadcast sent to ${insertRes.rows.length} users successfully.` });
   } catch (error) {
     console.error('Broadcast Notification Error:', error);
     return res.status(500).json({ error: 'Failed to broadcast notification.' });
