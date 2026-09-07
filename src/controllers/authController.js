@@ -18,7 +18,7 @@ function generateOTP() {
  * POST /api/auth/register
  */
 exports.register = async (req, res) => {
-  const { name, email, password, username } = req.body;
+  const { name, email, password, username, gender } = req.body;
 
   if (!name || !email || !password || !username) {
     return res.status(400).json({ error: 'Please provide all details (name, email, username, password).' });
@@ -27,6 +27,11 @@ exports.register = async (req, res) => {
   const usernameClean = username.toLowerCase().trim();
 
   try {
+    // Ensure gender column exists
+    try {
+      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT ''`);
+    } catch (_) {}
+
     // Check if user already exists
     const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
     if (userCheck.rows.length > 0) {
@@ -57,10 +62,12 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    const genderClean = (gender || '').trim();
+
     // Insert user (defaults: is_verified = true for instant registration)
     const newUser = await db.query(
-      'INSERT INTO users (name, email, password_hash, username, is_verified) VALUES ($1, $2, $3, $4, TRUE) RETURNING id, name, email, username, is_verified',
-      [name.trim(), email.toLowerCase().trim(), passwordHash, usernameClean]
+      'INSERT INTO users (name, email, password_hash, username, gender, is_verified) VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING id, name, email, username, gender, bio, profile_picture, is_verified',
+      [name.trim(), email.toLowerCase().trim(), passwordHash, usernameClean, genderClean]
     );
 
     const user = newUser.rows[0];
@@ -76,6 +83,9 @@ exports.register = async (req, res) => {
         name: user.name,
         email: user.email,
         username: user.username,
+        gender: user.gender || '',
+        bio: user.bio || '',
+        profile_picture: user.profile_picture || '',
         is_verified: user.is_verified,
       },
     });
@@ -118,7 +128,7 @@ exports.verifyOTP = async (req, res) => {
 
     // Set user as verified
     const userResult = await db.query(
-      'UPDATE users SET is_verified = TRUE WHERE email = $1 RETURNING id, name, email, username, is_verified',
+      'UPDATE users SET is_verified = TRUE WHERE email = $1 RETURNING id, name, email, username, gender, bio, profile_picture, is_verified',
       [emailLower]
     );
 
@@ -137,7 +147,16 @@ exports.verifyOTP = async (req, res) => {
     return res.status(200).json({
       message: 'OTP verified successfully.',
       token,
-      user,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        gender: user.gender || '',
+        bio: user.bio || '',
+        profile_picture: user.profile_picture || '',
+        is_verified: user.is_verified,
+      },
     });
   } catch (error) {
     console.error('Error verifying OTP:', error);
@@ -210,8 +229,10 @@ exports.login = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        bio: user.bio,
-        profile_picture: user.profile_picture,
+        username: user.username || '',
+        gender: user.gender || '',
+        bio: user.bio || '',
+        profile_picture: user.profile_picture || '',
         is_verified: user.is_verified,
       },
     });

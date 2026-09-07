@@ -216,17 +216,26 @@ exports.getCreatorProfile = async (req, res) => {
  */
 exports.toggleFollow = async (req, res) => {
   const followerId = req.user.id;
-  const followingId = parseInt(req.params.creatorId);
+  const creatorParam = req.params.creatorId;
 
-  if (followerId === followingId) {
-    return res.status(400).json({ error: 'You cannot follow yourself.' });
+  if (!creatorParam) {
+    return res.status(400).json({ error: 'Creator ID or username is required.' });
   }
 
   try {
-    // Verify target user exists
-    const targetCheck = await db.query('SELECT * FROM users WHERE id = $1', [followingId]);
+    // Verify target user exists by ID or username
+    const targetCheck = await db.query(
+      'SELECT id FROM users WHERE id::text = $1 OR username = $2',
+      [creatorParam, creatorParam.toLowerCase().trim()]
+    );
     if (targetCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Creator not found.' });
+    }
+
+    const followingId = targetCheck.rows[0].id;
+
+    if (parseInt(followerId) === parseInt(followingId)) {
+      return res.status(400).json({ error: 'You cannot follow yourself.' });
     }
 
     const followCheck = await db.query(
@@ -253,7 +262,7 @@ exports.toggleFollow = async (req, res) => {
 
       // Send follow notification
       const followerInfo = await db.query('SELECT name, username FROM users WHERE id = $1', [followerId]);
-      const followerName = followerInfo.rows[0].name || followerInfo.rows[0].username;
+      const followerName = followerInfo.rows[0]?.name || followerInfo.rows[0]?.username || 'Someone';
       
       await db.query(
         `INSERT INTO notifications (user_id, actor_id, type, text)
@@ -280,21 +289,44 @@ exports.toggleFollow = async (req, res) => {
 /**
  * Get followed creators list
  * GET /api/users/following
+ * GET /api/users/following/:username
  */
 exports.getFollowing = async (req, res) => {
-  const userId = req.user.id;
-
   try {
+    let targetUserId = req.user ? req.user.id : null;
+    const { username } = req.params;
+
+    if (username) {
+      const userRes = await db.query(
+        'SELECT id FROM users WHERE username = $1 OR id::text = $1',
+        [username.toLowerCase().trim()]
+      );
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+      targetUserId = userRes.rows[0].id;
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'User ID or username is required.' });
+    }
+
+    const currentUserId = req.user ? req.user.id : null;
+
     const result = await db.query(
       `SELECT 
         u.id,
         u.name,
         u.username,
-        u.profile_picture
+        u.profile_picture,
+        u.bio,
+        u.is_verified,
+        EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = u.id) as is_following
       FROM users u
       INNER JOIN user_follows f ON u.id = f.following_id
-      WHERE f.follower_id = $1`,
-      [userId]
+      WHERE f.follower_id = $1
+      ORDER BY f.created_at DESC`,
+      [targetUserId, currentUserId]
     );
 
     return res.status(200).json({
@@ -303,6 +335,58 @@ exports.getFollowing = async (req, res) => {
   } catch (error) {
     console.error('Error fetching following list:', error);
     return res.status(500).json({ error: 'Server error fetching following list.' });
+  }
+};
+
+/**
+ * Get followers list
+ * GET /api/users/followers
+ * GET /api/users/followers/:username
+ */
+exports.getFollowers = async (req, res) => {
+  try {
+    let targetUserId = req.user ? req.user.id : null;
+    const { username } = req.params;
+
+    if (username) {
+      const userRes = await db.query(
+        'SELECT id FROM users WHERE username = $1 OR id::text = $1',
+        [username.toLowerCase().trim()]
+      );
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+      targetUserId = userRes.rows[0].id;
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'User ID or username is required.' });
+    }
+
+    const currentUserId = req.user ? req.user.id : null;
+
+    const result = await db.query(
+      `SELECT 
+        u.id,
+        u.name,
+        u.username,
+        u.profile_picture,
+        u.bio,
+        u.is_verified,
+        EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = u.id) as is_following
+      FROM users u
+      INNER JOIN user_follows f ON u.id = f.follower_id
+      WHERE f.following_id = $1
+      ORDER BY f.created_at DESC`,
+      [targetUserId, currentUserId]
+    );
+
+    return res.status(200).json({
+      followers: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching followers list:', error);
+    return res.status(500).json({ error: 'Server error fetching followers list.' });
   }
 };
 

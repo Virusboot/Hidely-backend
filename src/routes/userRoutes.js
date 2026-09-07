@@ -16,8 +16,13 @@ router.get('/profile/:username', authMiddleware.optional, userController.getCrea
 // Toggle follow a user (private)
 router.post('/follow/:creatorId', authMiddleware, userController.toggleFollow);
 
-// Get list of followed creators (private)
-router.get('/following', authMiddleware, userController.getFollowing);
+// Get list of followers (private/optional)
+router.get('/followers', authMiddleware.optional, userController.getFollowers);
+router.get('/followers/:username', authMiddleware.optional, userController.getFollowers);
+
+// Get list of followed creators (private/optional)
+router.get('/following', authMiddleware.optional, userController.getFollowing);
+router.get('/following/:username', authMiddleware.optional, userController.getFollowing);
 
 // Search users by username or name (public/optional auth)
 router.get('/search', authMiddleware.optional, userController.searchUsers);
