@@ -1,6 +1,28 @@
+const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
-// Create the transporter using environment variables or a default mock structure
+// Resend Configuration and Environment Validation
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendFromEmail = process.env.RESEND_FROM_EMAIL;
+
+if (!resendApiKey) {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[Resend] Warning: RESEND_API_KEY environment variable is missing in production. Email delivery will be skipped.');
+  } else {
+    console.warn('[Resend] RESEND_API_KEY environment variable is not configured.');
+  }
+}
+
+if (!resendFromEmail && process.env.NODE_ENV === 'production') {
+  console.warn('[Resend] Warning: RESEND_FROM_EMAIL environment variable is missing in production.');
+}
+
+// Initialize Resend SDK instance if API key is provided
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+/**
+ * Legacy SMTP Transporter retained for backward compatibility
+ */
 const createTransporter = () => {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT || 587;
@@ -8,42 +30,39 @@ const createTransporter = () => {
   const pass = process.env.SMTP_PASS;
 
   if (!host || !user || !pass) {
-    console.warn('[SMTP] Missing SMTP configuration environment variables. Emails will not be sent.');
     return null;
   }
 
   return nodemailer.createTransport({
     host: host,
     port: parseInt(port),
-    secure: parseInt(port) === 465, // true for 465, false for other ports
+    secure: parseInt(port) === 465,
     auth: {
       user: user,
       pass: pass,
     },
-    // Force IPv4 to prevent ENETUNREACH errors on Render outbound connections
     family: 4,
   });
 };
 
 /**
- * Send OTP Verification Email
+ * Send OTP Verification Email via Resend Email API
  * @param {string} toEmail - Recipient email address
  * @param {string} otpCode - 4-digit OTP code
+ * @returns {Promise<boolean>} True if email delivery to Resend API succeeded, false otherwise
  */
 const sendOTPEmail = async (toEmail, otpCode) => {
-  const transporter = createTransporter();
-
-  if (!transporter) {
-    console.warn(`[SMTP] Skipped sending OTP email to ${toEmail} because SMTP is not configured.`);
+  if (!toEmail) {
+    console.error('[Email] Cannot send OTP: No recipient email provided.');
     return false;
   }
 
-  const mailOptions = {
-    from: `"Hidely App" <${process.env.SMTP_USER}>`,
-    to: toEmail,
-    subject: 'Hidely - Verify Your Email Address',
-    text: `Hello,\n\nThank you for signing up on Hidely! Your verification code is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nBest regards,\nThe Hidely Team`,
-    html: `
+  // Primary production email sending path using Resend API SDK
+  if (resendApiKey && resend) {
+    const fromAddress = resendFromEmail || 'Hidely App <onboarding@resend.dev>';
+    const subject = 'Hidely - Verify Your Email Address';
+    const textContent = `Hello,\n\nThank you for signing up on Hidely! Your verification code is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nBest regards,\nThe Hidely Team`;
+    const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
         <h2 style="color: #6C63FF; text-align: center;">Welcome to Hidely!</h2>
         <p>Hello,</p>
@@ -57,19 +76,36 @@ const sendOTPEmail = async (toEmail, otpCode) => {
         <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 20px 0;">
         <p style="font-size: 12px; color: #999; text-align: center;">If you did not request this email, you can safely ignore it.</p>
       </div>
-    `,
-  };
+    `;
 
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[SMTP] OTP Email sent successfully to ${toEmail}. Message ID: ${info.messageId}`);
-    return true;
-  } catch (error) {
-    console.error(`[SMTP] Error sending email to ${toEmail}:`, error);
-    return false;
+    try {
+      const { data, error } = await resend.emails.send({
+        from: fromAddress,
+        to: [toEmail],
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+      });
+
+      if (error) {
+        console.error(`[Resend] Error sending email to ${toEmail}:`, error.message || error);
+        return false;
+      }
+
+      console.log(`[Resend] OTP Email sent successfully to ${toEmail}. Message ID: ${data?.id}`);
+      return true;
+    } catch (error) {
+      console.error(`[Resend] Exception while sending email to ${toEmail}:`, error.message || error);
+      return false;
+    }
   }
+
+  console.warn(`[Resend] RESEND_API_KEY is not configured. Email delivery to ${toEmail} skipped.`);
+  return false;
 };
 
 module.exports = {
   sendOTPEmail,
+  createTransporter,
 };
+
