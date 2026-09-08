@@ -38,7 +38,9 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS policy violation: origin ${origin} is not allowed.`));
+    const err = new Error(`CORS policy violation: origin ${origin} is not allowed.`);
+err.status = 403;
+return callback(err);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -51,7 +53,9 @@ function getSocketCorsConfig() {
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(new Error('CORS origin not allowed for socket connection'));
+      const err = new Error('CORS origin not allowed for socket connection');
+err.status = 403;
+return callback(err);
     },
     methods: ['GET', 'POST'],
     credentials: true,

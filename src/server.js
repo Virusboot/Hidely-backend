@@ -18,6 +18,7 @@ const gamificationRoutes = require('./routes/gamificationRoutes');
 const { initSocket } = require('./socket');
 
 const app = express();
+app.disable('x-powered-by'); // Disable Express identification in production
 const server = http.createServer(app);
 const io = initSocket(server);
 const PORT = process.env.PORT || 5050;
