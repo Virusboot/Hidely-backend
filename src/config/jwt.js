@@ -1,17 +1,14 @@
 require('dotenv').config();
 
-const isProduction = process.env.NODE_ENV === 'production';
 const rawSecret = process.env.JWT_SECRET;
 
-if (isProduction && (!rawSecret || rawSecret.trim() === '')) {
-  console.error('FATAL ERROR: JWT_SECRET environment variable is not defined in production environment.');
-  process.exit(1);
+if (!rawSecret || rawSecret.trim() === '') {
+  console.error('FATAL CONFIGURATION ERROR: JWT_SECRET environment variable is missing or empty!');
+  throw new Error('FATAL CONFIGURATION ERROR: JWT_SECRET environment variable is missing or empty!');
 }
 
 // Centralized authoritative JWT secret for Express & Socket.IO
-const JWT_SECRET = (rawSecret && rawSecret.trim() !== '') 
-  ? rawSecret.trim() 
-  : 'hidely_super_secret_jwt_key_2026';
+const JWT_SECRET = rawSecret.trim();
 
 module.exports = {
   JWT_SECRET,

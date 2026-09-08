@@ -151,21 +151,76 @@ const startServer = async () => {
     const dbTest = await db.query('SELECT NOW()');
     console.log(`PostgreSQL connection active. DB Server Time: ${dbTest.rows[0].now}`);
 
-    // Ensure user ID 1 is mapped to hidely_official
-    try {
-      await db.query(`
-        INSERT INTO users (name, email, password_hash, username, points, is_verified)
-        VALUES ('Hidely Official', 'admin@hidely.com', '$2b$10$UnPK41UWhV/42uLshGepx.a3v0Jj.zOQW/vXz3W.H/fDqI4Vp.KzS', 'hidely_official', 12800, true)
-        ON CONFLICT (email) DO UPDATE 
-        SET is_admin = true, is_verified = true;
-      `);
-      console.log('Admin user mappings updated to hidely_official successfully.');
-    } catch (dbErr) {
-      console.error('Error updating admin user mappings:', dbErr.message);
+    // In non-production environments, ensure default dev seed mapping exists
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        await db.query(`
+          INSERT INTO users (name, email, password_hash, username, points, is_verified)
+          VALUES ('Hidely Official', 'admin@hidely.com', '$2b$10$UnPK41UWhV/42uLshGepx.a3v0Jj.zOQW/vXz3W.H/fDqI4Vp.KzS', 'hidely_official', 12800, true)
+          ON CONFLICT (email) DO UPDATE 
+          SET is_admin = true, is_verified = true;
+        `);
+        console.log('Admin user mappings updated to hidely_official successfully.');
+      } catch (dbErr) {
+        console.error('Error updating admin user mappings:', dbErr.message);
+      }
     }
   } catch (error) {
     console.warn('PostgreSQL connection check warning:', error.message);
   }
 };
+
+// Graceful Shutdown Handler & Signal Listeners
+let isShuttingDown = false;
+
+const gracefulShutdown = async (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.log(`\n[Graceful Shutdown] Received ${signal}. Starting shutdown sequence...`);
+
+  // Set 10-second bounded timeout to prevent process hanging
+  const shutdownTimeout = setTimeout(() => {
+    console.error('[Graceful Shutdown] Bounded shutdown timeout reached (10s). Terminating process.');
+    process.exit(1);
+  }, 10000);
+
+  if (shutdownTimeout.unref) {
+    shutdownTimeout.unref();
+  }
+
+  try {
+    // 1. Stop accepting new HTTP connections
+    await new Promise((resolve) => {
+      server.close((err) => {
+        if (err) {
+          console.error('[Graceful Shutdown] Error closing HTTP server:', err.message);
+        } else {
+          console.log('[Graceful Shutdown] HTTP server closed successfully.');
+        }
+        resolve();
+      });
+    });
+
+    // 2. Drain and close PostgreSQL database pool
+    if (db.pool && typeof db.pool.end === 'function') {
+      try {
+        await db.pool.end();
+        console.log('[Graceful Shutdown] PostgreSQL pool drained and closed successfully.');
+      } catch (dbErr) {
+        console.error('[Graceful Shutdown] Error closing PostgreSQL pool:', dbErr.message);
+      }
+    }
+
+    console.log('[Graceful Shutdown] Clean shutdown complete. Exiting.');
+    process.exit(0);
+  } catch (err) {
+    console.error('[Graceful Shutdown] Critical error during shutdown:', err.message);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 startServer();

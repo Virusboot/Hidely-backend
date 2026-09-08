@@ -59,28 +59,32 @@ const loginAdmin = async (req, res) => {
  */
 const getDashboardStats = async (req, res) => {
   try {
-    const usersCountRes = await db.query('SELECT COUNT(*) FROM users');
-    const postsCountRes = await db.query('SELECT COUNT(*) FROM posts');
-    const placesCountRes = await db.query('SELECT COUNT(*) FROM places');
-    const likesCountRes = await db.query('SELECT COUNT(*) FROM post_likes');
-    const commentsCountRes = await db.query('SELECT COUNT(*) FROM post_comments');
-    const verifiedUsersRes = await db.query('SELECT COUNT(*) FROM users WHERE is_verified = true');
+    const [countsRes, recentPostsRes] = await Promise.all([
+      db.query(`
+        SELECT
+          (SELECT COUNT(*)::int FROM users) AS total_users,
+          (SELECT COUNT(*)::int FROM posts) AS total_posts,
+          (SELECT COUNT(*)::int FROM places) AS total_places,
+          (SELECT COUNT(*)::int FROM post_likes) AS total_likes,
+          (SELECT COUNT(*)::int FROM post_comments) AS total_comments,
+          (SELECT COUNT(*)::int FROM users WHERE is_verified = true) AS verified_creators
+      `),
+      db.query(
+        `SELECT p.id, p.caption, p.image_url, p.created_at, u.name as author_name, u.username as author_username
+         FROM posts p
+         JOIN users u ON p.user_id = u.id
+         ORDER BY p.created_at DESC
+         LIMIT 5`
+      ),
+    ]);
 
-    const totalUsers = parseInt(usersCountRes.rows[0].count) || 0;
-    const totalPosts = parseInt(postsCountRes.rows[0].count) || 0;
-    const totalPlaces = parseInt(placesCountRes.rows[0].count) || 0;
-    const totalLikes = parseInt(likesCountRes.rows[0].count) || 0;
-    const totalComments = parseInt(commentsCountRes.rows[0].count) || 0;
-    const verifiedCreators = parseInt(verifiedUsersRes.rows[0].count) || 0;
-
-    // Recent activity posts
-    const recentPostsRes = await db.query(
-      `SELECT p.id, p.caption, p.image_url, p.created_at, u.name as author_name, u.username as author_username
-       FROM posts p
-       JOIN users u ON p.user_id = u.id
-       ORDER BY p.created_at DESC
-       LIMIT 5`
-    );
+    const countsRow = countsRes.rows[0] || {};
+    const totalUsers = parseInt(countsRow.total_users) || 0;
+    const totalPosts = parseInt(countsRow.total_posts) || 0;
+    const totalPlaces = parseInt(countsRow.total_places) || 0;
+    const totalLikes = parseInt(countsRow.total_likes) || 0;
+    const totalComments = parseInt(countsRow.total_comments) || 0;
+    const verifiedCreators = parseInt(countsRow.verified_creators) || 0;
 
     return res.json({
       stats: {

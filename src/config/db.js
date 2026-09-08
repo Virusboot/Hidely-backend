@@ -10,7 +10,13 @@ const pool = new Pool({
   database: !process.env.DATABASE_URL ? (process.env.DB_DATABASE || 'hidely') : undefined,
   password: !process.env.DATABASE_URL ? (process.env.DB_PASSWORD || 'postgres') : undefined,
   port: !process.env.DATABASE_URL ? (process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432) : undefined,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: isProduction
+    ? {
+        rejectUnauthorized: true,
+        ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}),
+      }
+    : false,
+  options: '-c statement_timeout=10000',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

@@ -756,33 +756,22 @@ exports.getExplorePosts = async (req, res) => {
     }
 
     let query = `
-      SELECT 
-        p.id, 
-        p.caption, 
-        p.image_url, 
-        p.location, 
-        p.category, 
-        p.likes_count, 
-        p.created_at,
-        u.id AS author_id,
-        u.name AS author_name,
-        u.username AS author_username,
-        u.profile_picture AS author_profile_picture,
-        COALESCE(
-          (SELECT TRUE FROM post_likes WHERE post_id = p.id AND user_id = $1 LIMIT 1), 
-          FALSE
-        ) AS is_liked,
-        COALESCE(
-          (SELECT TRUE FROM post_bookmarks WHERE post_id = p.id AND user_id = $1 LIMIT 1), 
-          FALSE
-        ) AS is_bookmarked,
-        COALESCE(
-          (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id), 
-          0
-        ) AS comments_count
-      FROM posts p
-      INNER JOIN users u ON p.user_id = u.id
-      WHERE 1=1
+      WITH target_posts AS (
+        SELECT 
+          p.id, 
+          p.caption, 
+          p.image_url, 
+          p.location, 
+          p.category, 
+          p.likes_count, 
+          p.created_at,
+          u.id AS author_id,
+          u.name AS author_name,
+          u.username AS author_username,
+          u.profile_picture AS author_profile_picture
+        FROM posts p
+        INNER JOIN users u ON p.user_id = u.id
+        WHERE 1=1
     `;
 
     const queryParams = [currentUserId];
@@ -806,19 +795,64 @@ exports.getExplorePosts = async (req, res) => {
       paramIndex++;
     }
 
+    let orderClause = `ORDER BY p.created_at DESC`;
+    let outerOrderClause = `ORDER BY tp.created_at DESC`;
+
     if (sortBy === 'A-Z') {
-      query += ` ORDER BY p.caption ASC`;
+      orderClause = `ORDER BY p.caption ASC`;
+      outerOrderClause = `ORDER BY tp.caption ASC`;
     } else if (sortBy === 'Z-A') {
-      query += ` ORDER BY p.caption DESC`;
-    } else {
-      query += ` ORDER BY p.created_at DESC`;
+      orderClause = `ORDER BY p.caption DESC`;
+      outerOrderClause = `ORDER BY tp.caption DESC`;
     }
+
+    query += ` ${orderClause}`;
 
     if (parsedLimit !== null) {
       query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       queryParams.push(parsedLimit, parsedOffset);
       paramIndex += 2;
     }
+
+    query += `
+      )
+      SELECT 
+        tp.id,
+        tp.caption,
+        tp.image_url,
+        tp.location,
+        tp.category,
+        tp.likes_count,
+        tp.created_at,
+        tp.author_id,
+        tp.author_name,
+        tp.author_username,
+        tp.author_profile_picture,
+        COALESCE(liked.is_liked, FALSE) AS is_liked,
+        COALESCE(bookmarked.is_bookmarked, FALSE) AS is_bookmarked,
+        COALESCE(comments.comments_count, 0)::int AS comments_count
+      FROM target_posts tp
+      LEFT JOIN LATERAL (
+        SELECT TRUE AS is_liked
+        FROM post_likes
+        WHERE post_id = tp.id
+          AND user_id = $1
+        LIMIT 1
+      ) liked ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT TRUE AS is_bookmarked
+        FROM post_bookmarks
+        WHERE post_id = tp.id
+          AND user_id = $1
+        LIMIT 1
+      ) bookmarked ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS comments_count
+        FROM post_comments
+        WHERE post_id = tp.id
+      ) comments ON TRUE
+      ${outerOrderClause}
+    `;
 
     const result = await db.query(query, queryParams);
 

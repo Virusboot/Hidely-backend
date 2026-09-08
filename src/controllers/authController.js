@@ -26,11 +26,6 @@ exports.register = async (req, res) => {
   const usernameClean = username.toLowerCase().trim();
 
   try {
-    // Ensure gender column exists
-    try {
-      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT ''`);
-    } catch (_) {}
-
     // Check if user already exists
     const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
     if (userCheck.rows.length > 0) {
