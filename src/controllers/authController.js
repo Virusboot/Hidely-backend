@@ -201,9 +201,7 @@ exports.login = async (req, res) => {
         console.error('Failed to send login verification OTP email:', emailErr);
       });
 
-      console.log(`\n===========================================`);
-      console.log(`[DEV] New OTP for unverified login (${emailLower}): ${otpCode}`);
-      console.log(`===========================================\n`);
+
 
       return res.status(403).json({
         error: 'Please verify your account first.',
@@ -268,9 +266,7 @@ exports.forgotPassword = async (req, res) => {
       console.error('Failed to send forgot password OTP email:', emailErr);
     });
 
-    console.log(`\n===========================================`);
-    console.log(`[DEV] Forgot Password OTP for ${emailLower}: ${otpCode}`);
-    console.log(`===========================================\n`);
+
 
     return res.status(200).json({
       message: 'Password reset OTP has been generated.',
