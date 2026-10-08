@@ -15,6 +15,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
+const mapRoutes = require('./routes/mapRoutes');
 const { initSocket } = require('./socket');
 
 const app = express();
@@ -101,6 +102,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/gamification', gamificationRoutes);
+app.use('/api/map', mapRoutes);
 
 // Serve Unified Hidely Web Platform at Root /
 const websiteDir = path.join(__dirname, '../public/website');
