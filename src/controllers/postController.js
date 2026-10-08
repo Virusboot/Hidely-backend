@@ -408,6 +408,9 @@ exports.getSavedPosts = async (req, res) => {
  */
 exports.getUserPosts = async (req, res) => {
   const userId = parseInt(req.params.userId);
+  if (isNaN(userId)) {
+    return res.status(200).json({ posts: [] });
+  }
   const currentUserId = req.user ? req.user.id : null;
 
   try {
@@ -678,6 +681,9 @@ exports.deleteComment = async (req, res) => {
  */
 exports.getPostById = async (req, res) => {
   const postId = parseInt(req.params.id);
+  if (isNaN(postId)) {
+    return res.status(404).json({ error: 'Post not found.' });
+  }
   const currentUserId = req.user ? req.user.id : null;
 
   try {
