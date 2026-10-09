@@ -154,6 +154,41 @@ const startServer = async () => {
     const dbTest = await db.query('SELECT NOW()');
     console.log(`PostgreSQL connection active. DB Server Time: ${dbTest.rows[0].now}`);
 
+    // Auto-verify and apply schema migrations
+    try {
+      console.log('[Schema] Checking database schema & columns...');
+      await db.query(`
+        ALTER TABLE posts 
+        ADD COLUMN IF NOT EXISTS duplicate_cluster_id VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+        ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+        ADD COLUMN IF NOT EXISTS location_accuracy_meters DOUBLE PRECISION,
+        ADD COLUMN IF NOT EXISTS location_source VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS location_captured_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS canonical_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS landmark_type VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS state VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS ai_confidence DOUBLE PRECISION,
+        ADD COLUMN IF NOT EXISTS place_id INTEGER,
+        ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'approved';
+
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS current_level INTEGER DEFAULT 1,
+        ADD COLUMN IF NOT EXISTS current_rank INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS explorer_score DOUBLE PRECISION DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS last_points_updated_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS featured_badge_id INTEGER;
+      `);
+      console.log('[Schema] All required database tables & columns verified.');
+    } catch (schemaErr) {
+      console.error('[Schema] Migration verification notice:', schemaErr.message);
+    }
+
     // In non-production environments, ensure default dev seed mapping exists
     if (process.env.NODE_ENV !== 'production') {
       try {

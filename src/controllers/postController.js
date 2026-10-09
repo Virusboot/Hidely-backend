@@ -108,33 +108,93 @@ exports.createPost = async (req, res) => {
       }
     }
 
-    const newPostResult = await db.query(
-      `INSERT INTO posts 
-       (user_id, caption, image_url, location, category, latitude, longitude, location_accuracy_meters, location_source, location_captured_at, canonical_name, normalized_name, landmark_type, city, state, country, ai_confidence, duplicate_cluster_id, place_id) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
-       RETURNING *`,
-      [
-        userId, 
-        caption || '', 
-        imageUrl, 
-        location || '', 
-        category || '',
-        validLat,
-        validLng,
-        validAccuracy,
-        validSource,
-        validCapturedAt,
-        cName,
-        normName,
-        landmark_type || '',
-        city || '',
-        state || '',
-        country || '',
-        parsedAiConfidence,
-        clusterId,
-        masterPlaceId
-      ]
-    );
+    let newPostResult;
+    try {
+      newPostResult = await db.query(
+        `INSERT INTO posts 
+         (user_id, caption, image_url, location, category, latitude, longitude, location_accuracy_meters, location_source, location_captured_at, canonical_name, normalized_name, landmark_type, city, state, country, ai_confidence, duplicate_cluster_id, place_id) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+         RETURNING *`,
+        [
+          userId, 
+          caption || '', 
+          imageUrl, 
+          location || '', 
+          category || '',
+          validLat,
+          validLng,
+          validAccuracy,
+          validSource,
+          validCapturedAt,
+          cName,
+          normName,
+          landmark_type || '',
+          city || '',
+          state || '',
+          country || '',
+          parsedAiConfidence,
+          clusterId,
+          masterPlaceId
+        ]
+      );
+    } catch (insertErr) {
+      console.error('Extended post insert failed, attempting auto-migration and retry:', insertErr.message);
+      try {
+        await db.query(`
+          ALTER TABLE posts 
+          ADD COLUMN IF NOT EXISTS duplicate_cluster_id VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS location_accuracy_meters DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS location_source VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS location_captured_at TIMESTAMP WITH TIME ZONE,
+          ADD COLUMN IF NOT EXISTS canonical_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS landmark_type VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS state VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS ai_confidence DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS place_id INTEGER;
+        `);
+
+        newPostResult = await db.query(
+          `INSERT INTO posts 
+           (user_id, caption, image_url, location, category, latitude, longitude, location_accuracy_meters, location_source, location_captured_at, canonical_name, normalized_name, landmark_type, city, state, country, ai_confidence, duplicate_cluster_id, place_id) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+           RETURNING *`,
+          [
+            userId, 
+            caption || '', 
+            imageUrl, 
+            location || '', 
+            category || '',
+            validLat,
+            validLng,
+            validAccuracy,
+            validSource,
+            validCapturedAt,
+            cName,
+            normName,
+            landmark_type || '',
+            city || '',
+            state || '',
+            country || '',
+            parsedAiConfidence,
+            clusterId,
+            masterPlaceId
+          ]
+        );
+      } catch (fallbackErr) {
+        console.error('Retrying standard insert with core columns:', fallbackErr.message);
+        newPostResult = await db.query(
+          `INSERT INTO posts (user_id, caption, image_url, location, category) 
+           VALUES ($1, $2, $3, $4, $5) 
+           RETURNING *`,
+          [userId, caption || '', imageUrl, location || '', category || '']
+        );
+      }
+    }
 
     const post = newPostResult.rows[0];
 
