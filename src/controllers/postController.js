@@ -62,7 +62,7 @@ exports.createPost = async (req, res) => {
       }
     }
 
-    if (location_source === 'camera_capture' || location_source === 'manual') {
+    if (location_source === 'camera_capture' || location_source === 'manual' || location_source === 'photo_exif') {
       validSource = location_source;
     }
 
@@ -142,12 +142,14 @@ exports.createPost = async (req, res) => {
     let isNewMasterPlace = false;
     let isDuplicatePlace = false;
     if (cName && cName.trim() !== '' && cName.trim() !== 'Unknown Location') {
-      const placeSearch = await db.query('SELECT id FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1', [cName.trim()]);
-      if (placeSearch.rows.length > 0) {
-        isDuplicatePlace = true;
-      } else {
-        isNewMasterPlace = true;
-      }
+      try {
+        const placeSearch = await db.query('SELECT id FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1', [cName.trim()]);
+        if (placeSearch.rows.length > 0) {
+          isDuplicatePlace = true;
+        } else {
+          isNewMasterPlace = true;
+        }
+      } catch (_) {}
     }
 
     try {
@@ -164,22 +166,25 @@ exports.createPost = async (req, res) => {
       console.error('Error processing post rewards:', rewardErr.message);
     }
 
-    // Fetch creator's name/username
-    const authorResult = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
-    const authorName = authorResult.rows[0]?.name || authorResult.rows[0]?.username || 'Someone';
+    // Send notifications to all followers (excluding author)
+    try {
+      const authorResult = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
+      const authorName = authorResult.rows[0]?.name || authorResult.rows[0]?.username || 'Someone';
 
-    // Send notifications to all followers (excluding author) using a single set-based PostgreSQL query
-    await db.query(
-      `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
-       SELECT follower_id, $1, 'new_post', $2, $3
-       FROM user_follows
-       WHERE following_id = $1 AND follower_id != $1`,
-      [
-        userId,
-        post.id,
-        `${authorName} posted a new travel post.`
-      ]
-    );
+      await db.query(
+        `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
+         SELECT follower_id, $1, 'new_post', $2, $3
+         FROM user_follows
+         WHERE following_id = $1 AND follower_id != $1`,
+        [
+          userId,
+          post.id,
+          `${authorName} posted a new travel post.`
+        ]
+      );
+    } catch (notifErr) {
+      console.error('Error sending post notifications:', notifErr.message);
+    }
 
     return res.status(201).json({
       message: 'Post created successfully.',
@@ -187,7 +192,7 @@ exports.createPost = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating post:', error);
-    return res.status(500).json({ error: 'Server error creating post.' });
+    return res.status(500).json({ error: error.message || 'Server error creating post.' });
   }
 };
 

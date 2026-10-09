@@ -9,8 +9,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+const path = require('path');
+
 /**
  * Uploads a local file to Cloudinary and unlinks the local file.
+ * Falls back to local storage if Cloudinary upload fails.
  * @param {string} localFilePath - Path to the local file saved by Multer
  * @param {string} folder - Cloudinary folder/category
  * @returns {Promise<string>} - Secure URL of the uploaded asset
@@ -19,30 +22,29 @@ const uploadToCloudinary = async (localFilePath, folder = 'hidely') => {
   try {
     if (!localFilePath) return null;
 
-    // Upload to Cloudinary with auto resource type detection (images/videos)
-    const response = await cloudinary.uploader.upload(localFilePath, {
-      folder: folder,
-      resource_type: 'auto',
-    });
+    if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+      const response = await cloudinary.uploader.upload(localFilePath, {
+        folder: folder,
+        resource_type: 'auto',
+      });
 
-    // Remove file from local uploads folder to keep disk clean
-    if (fs.existsSync(localFilePath)) {
-      fs.unlinkSync(localFilePath);
-    }
-
-    return response.secure_url;
-  } catch (error) {
-    console.error('Cloudinary upload failed:', error);
-    // Clean up local file even if upload fails
-    if (fs.existsSync(localFilePath)) {
-      try {
-        fs.unlinkSync(localFilePath);
-      } catch (unlinkError) {
-        console.error('Failed to delete temporary local file:', unlinkError);
+      if (fs.existsSync(localFilePath)) {
+        try { fs.unlinkSync(localFilePath); } catch (_) {}
       }
+
+      return response.secure_url;
     }
-    throw error;
+  } catch (error) {
+    console.error('Cloudinary upload error, using local file fallback:', error.message || error);
   }
+
+  // Resilient fallback: Return local uploads path so post upload NEVER fails
+  if (localFilePath && fs.existsSync(localFilePath)) {
+    const filename = path.basename(localFilePath);
+    return `/uploads/${filename}`;
+  }
+
+  return null;
 };
 
 module.exports = {
