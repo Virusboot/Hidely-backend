@@ -33,6 +33,11 @@ exports.getProfile = async (req, res) => {
     }
 
     const row = userResult.rows[0];
+    const postsCount = parseInt(row.posts_count || 0);
+    const followersCount = parseInt(row.followers_count || 0);
+    const cleanUsername = (row.username || '').toLowerCase().trim();
+    const isOfficial = cleanUsername === 'hidely_official' || cleanUsername === 'hidely';
+    const isVerified = isOfficial || postsCount >= 50 || followersCount >= 50000;
 
     return res.status(200).json({
       user: {
@@ -44,9 +49,9 @@ exports.getProfile = async (req, res) => {
         gender: row.gender,
         bio: row.bio,
         profile_picture: row.profile_picture,
-        is_verified: row.is_verified,
-        posts_count: parseInt(row.posts_count || 0),
-        followers_count: parseInt(row.followers_count || 0),
+        is_verified: isVerified,
+        posts_count: postsCount,
+        followers_count: followersCount,
         followings_count: parseInt(row.followings_count || 0),
       },
     });
@@ -202,6 +207,12 @@ exports.getCreatorProfile = async (req, res) => {
       [creatorRow.id, currentUserId]
     );
 
+    const postsCount = parseInt(creatorRow.posts_count || 0);
+    const followersCount = parseInt(creatorRow.followers_count || 0);
+    const cleanUname = (cleanUsername || '').toLowerCase().trim();
+    const isOfficial = cleanUname === 'hidely_official' || cleanUname === 'hidely';
+    const isVerified = isOfficial || postsCount >= 50 || followersCount >= 50000;
+
     return res.status(200).json({
       creator: {
         id: creatorRow.id,
@@ -210,9 +221,9 @@ exports.getCreatorProfile = async (req, res) => {
         pronouns: creatorRow.pronouns,
         bio: creatorRow.bio,
         profile_picture: creatorRow.profile_picture,
-        is_verified: creatorRow.is_verified,
-        posts_count: parseInt(creatorRow.posts_count || 0),
-        followers_count: parseInt(creatorRow.followers_count || 0),
+        is_verified: isVerified,
+        posts_count: postsCount,
+        followers_count: followersCount,
         followings_count: parseInt(creatorRow.followings_count || 0),
         is_following: creatorRow.is_following === true,
       },
@@ -334,7 +345,11 @@ exports.getFollowing = async (req, res) => {
         u.username,
         u.profile_picture,
         u.bio,
-        u.is_verified,
+        (
+          LOWER(u.username) IN ('hidely_official', 'hidely') 
+          OR (SELECT COUNT(*)::int FROM posts p_sub WHERE p_sub.user_id = u.id) >= 50 
+          OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
+        ) AS is_verified,
         EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = u.id) as is_following
       FROM users u
       INNER JOIN user_follows f ON u.id = f.following_id
@@ -386,7 +401,11 @@ exports.getFollowers = async (req, res) => {
         u.username,
         u.profile_picture,
         u.bio,
-        u.is_verified,
+        (
+          LOWER(u.username) IN ('hidely_official', 'hidely') 
+          OR (SELECT COUNT(*)::int FROM posts p_sub WHERE p_sub.user_id = u.id) >= 50 
+          OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
+        ) AS is_verified,
         EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = u.id) as is_following
       FROM users u
       INNER JOIN user_follows f ON u.id = f.follower_id
@@ -412,17 +431,21 @@ exports.getLeaderboard = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT 
-        id,
-        name,
-        username,
-        profile_picture,
-        COALESCE(points, 7120) as points,
-        pronouns,
-        bio,
-        is_verified
-      FROM users
-      WHERE username IS NOT NULL AND username != ''
-      ORDER BY points DESC, id ASC`
+        u.id,
+        u.name,
+        u.username,
+        u.profile_picture,
+        COALESCE(u.points, 7120) as points,
+        u.pronouns,
+        u.bio,
+        (
+          LOWER(u.username) IN ('hidely_official', 'hidely') 
+          OR (SELECT COUNT(*)::int FROM posts p_sub WHERE p_sub.user_id = u.id) >= 50 
+          OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
+        ) AS is_verified
+      FROM users u
+      WHERE u.username IS NOT NULL AND u.username != ''
+      ORDER BY points DESC, u.id ASC`
     );
 
     return res.status(200).json({
@@ -448,15 +471,19 @@ exports.searchUsers = async (req, res) => {
     const searchTerm = `%${q.trim()}%`;
     const result = await db.query(
       `SELECT 
-        id,
-        name,
-        username,
-        profile_picture,
-        bio,
-        is_verified
-      FROM users
-      WHERE (username ILIKE $1 OR name ILIKE $1)
-      ORDER BY id DESC
+        u.id,
+        u.name,
+        u.username,
+        u.profile_picture,
+        u.bio,
+        (
+          LOWER(u.username) IN ('hidely_official', 'hidely') 
+          OR (SELECT COUNT(*)::int FROM posts p_sub WHERE p_sub.user_id = u.id) >= 50 
+          OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
+        ) AS is_verified
+      FROM users u
+      WHERE (u.username ILIKE $1 OR u.name ILIKE $1)
+      ORDER BY u.id DESC
       LIMIT 20`,
       [searchTerm]
     );

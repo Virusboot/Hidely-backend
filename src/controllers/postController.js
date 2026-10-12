@@ -283,6 +283,16 @@ exports.getFeed = async (req, res) => {
         u.name AS author_name,
         u.username AS author_username,
         u.profile_picture AS author_profile_picture,
+        (
+          LOWER(u.username) IN ('hidely_official', 'hidely') 
+          OR (SELECT COUNT(*)::int FROM posts p_cnt WHERE p_cnt.user_id = u.id) >= 50 
+          OR (SELECT COUNT(*)::int FROM user_follows f_cnt WHERE f_cnt.following_id = u.id) >= 50000
+        ) AS author_is_verified,
+        (
+          LOWER(u.username) IN ('hidely_official', 'hidely') 
+          OR (SELECT COUNT(*)::int FROM posts p_cnt WHERE p_cnt.user_id = u.id) >= 50 
+          OR (SELECT COUNT(*)::int FROM user_follows f_cnt WHERE f_cnt.following_id = u.id) >= 50000
+        ) AS is_verified,
         EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) AS is_liked,
         EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) AS is_bookmarked,
         (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id) AS comments_count
