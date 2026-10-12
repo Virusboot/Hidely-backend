@@ -59,6 +59,10 @@ exports.getLeaderboard = async (req, res) => {
         LIMIT $1 OFFSET $2
       `;
     } else {
+      const intervalCondition = period === 'weekly'
+        ? "AND pt.created_at >= NOW() - INTERVAL '7 days'"
+        : (period === 'monthly' ? "AND pt.created_at >= NOW() - INTERVAL '30 days'" : "");
+
       query = `
         SELECT 
           u.id,
@@ -75,12 +79,11 @@ exports.getLeaderboard = async (req, res) => {
           b.rarity as featured_badge_rarity,
           b.category as featured_badge_category
         FROM users u
-        JOIN point_transactions pt ON pt.user_id = u.id
+        LEFT JOIN point_transactions pt ON pt.user_id = u.id ${intervalCondition}
         LEFT JOIN badges b ON b.id = u.featured_badge_id
-        ${timeClause}
         WHERE u.username IS NOT NULL AND u.username != ''
         GROUP BY u.id, b.id
-        ORDER BY points DESC, u.explorer_score DESC, u.id ASC
+        ORDER BY points DESC, u.total_points DESC, u.explorer_score DESC, u.id ASC
         LIMIT $1 OFFSET $2
       `;
     }
