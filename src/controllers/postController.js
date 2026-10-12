@@ -868,6 +868,10 @@ exports.getExplorePosts = async (req, res) => {
         query += ` AND (p.category ILIKE '%forest%')`;
       } else if (catLower.includes('heritage') || catLower.includes('historic')) {
         query += ` AND (p.category ILIKE '%heritage%' OR p.category ILIKE '%historic%')`;
+      } else if (catLower.includes('temple')) {
+        query += ` AND (p.category ILIKE '%temple%' OR p.caption ILIKE '%temple%' OR p.location ILIKE '%temple%' OR p.caption ILIKE '%mandir%')`;
+      } else if (catLower.includes('fort')) {
+        query += ` AND (p.category ILIKE '%fort%' OR p.caption ILIKE '%fort%' OR p.location ILIKE '%fort%')`;
       } else if (catLower.includes('desert')) {
         query += ` AND (p.category ILIKE '%desert%')`;
       } else {
