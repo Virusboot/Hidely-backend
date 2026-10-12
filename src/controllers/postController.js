@@ -849,9 +849,32 @@ exports.getExplorePosts = async (req, res) => {
     let paramIndex = 2;
 
     if (category && category !== 'All') {
-      query += ` AND p.category = $${paramIndex}`;
-      queryParams.push(category);
-      paramIndex++;
+      const catLower = category.toLowerCase().trim();
+      if (catLower.includes('mountain')) {
+        query += ` AND (p.category ILIKE '%mountain%')`;
+      } else if (catLower.includes('waterfall')) {
+        query += ` AND (p.category ILIKE '%waterfall%')`;
+      } else if (catLower.includes('river')) {
+        query += ` AND (p.category ILIKE '%river%')`;
+      } else if (catLower.includes('trek')) {
+        query += ` AND (p.category ILIKE '%trek%')`;
+      } else if (catLower.includes('camp')) {
+        query += ` AND (p.category ILIKE '%camp%')`;
+      } else if (catLower.includes('lake')) {
+        query += ` AND (p.category ILIKE '%lake%')`;
+      } else if (catLower.includes('beach')) {
+        query += ` AND (p.category ILIKE '%beach%')`;
+      } else if (catLower.includes('forest')) {
+        query += ` AND (p.category ILIKE '%forest%')`;
+      } else if (catLower.includes('heritage') || catLower.includes('historic')) {
+        query += ` AND (p.category ILIKE '%heritage%' OR p.category ILIKE '%historic%')`;
+      } else if (catLower.includes('desert')) {
+        query += ` AND (p.category ILIKE '%desert%')`;
+      } else {
+        query += ` AND p.category ILIKE $${paramIndex}`;
+        queryParams.push(`%${category}%`);
+        paramIndex++;
+      }
     }
 
     if (city && city !== 'All') {
