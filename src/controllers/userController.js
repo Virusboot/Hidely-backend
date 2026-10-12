@@ -146,7 +146,7 @@ exports.getCreatorProfile = async (req, res) => {
   const { username } = req.params;
   const currentUserId = req.user ? req.user.id : null;
 
-  try {
+    const cleanUsername = username ? username.trim().replace(/^@/, '') : '';
     const creatorResult = await db.query(
       `SELECT 
         u.id, 
@@ -164,8 +164,8 @@ exports.getCreatorProfile = async (req, res) => {
           FALSE
         ) AS is_following
        FROM users u
-       WHERE u.username = $1`,
-      [username.trim().toLowerCase(), currentUserId]
+       WHERE LOWER(u.username) = LOWER($1) OR u.username = $1 OR u.id::text = $1`,
+      [cleanUsername, currentUserId]
     );
 
     if (creatorResult.rows.length === 0) {
