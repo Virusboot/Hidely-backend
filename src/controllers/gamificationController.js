@@ -176,6 +176,14 @@ exports.getUserGamificationProfile = async (req, res) => {
       [user.featured_badge_id, userId]
     );
 
+    // Check if daily check-in claimed today
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const checkInRes = await db.query(
+      `SELECT id, created_at FROM point_transactions WHERE user_id = $1 AND event_type = 'daily_check_in' AND reference_id = $2 LIMIT 1`,
+      [userId, todayStr]
+    );
+    const isDailyCheckInClaimed = checkInRes.rows.length > 0;
+
     return res.status(200).json({
       success: true,
       profile: {
@@ -189,6 +197,7 @@ exports.getUserGamificationProfile = async (req, res) => {
         minXp: levelInfo.minXp,
         nextLevelMinXp: nextLevelThreshold ? nextLevelThreshold.minXp : totalPoints,
         rank,
+        isDailyCheckInClaimed,
         featuredBadge: user.featured_badge_id ? {
           id: user.featured_badge_id,
           name: user.featured_badge_name,
@@ -333,3 +342,19 @@ exports.adminAdjustPoints = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error adjusting points.' });
   }
 };
+
+/**
+ * POST /api/gamification/checkin
+ * Claim daily 10 points once every calendar day
+ */
+exports.dailyCheckIn = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await rewardService.processDailyCheckIn(userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in daily checkin:', error);
+    return res.status(500).json({ success: false, error: 'Server error processing daily check-in.' });
+  }
+};
+

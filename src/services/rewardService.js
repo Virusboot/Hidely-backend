@@ -4,24 +4,30 @@ const { createNotification } = require('../controllers/notificationController');
 
 // Dynamic Configurable Reward Amounts & Daily Maximum Caps
 let REWARD_CONFIG = {
-  // 1. Normal Contribution Points
-  normalContributionPoints: parseInt(process.env.REWARD_NORMAL_POST_POINTS) || 10,
+  // 1. Normal Contribution Points (Base post)
+  normalContributionPoints: parseInt(process.env.REWARD_NORMAL_POST_POINTS) || 20,
   maxDailyRewardedPosts: parseInt(process.env.REWARD_MAX_DAILY_POSTS) || 10,
-  maxNormalContributionDaily: parseInt(process.env.REWARD_MAX_NORMAL_DAILY_POINTS) || 100,
+  maxNormalContributionDaily: parseInt(process.env.REWARD_MAX_NORMAL_DAILY_POINTS) || 200,
 
-  // 2. Camera Location Bonus
-  cameraLocationBonus: parseInt(process.env.REWARD_CAMERA_LOCATION_POINTS) || 20,
-  maxCameraBonusDaily: parseInt(process.env.REWARD_MAX_CAMERA_BONUS_DAILY) || 200,
+  // 2. Camera Location Bonus (+30 pts, so 20 normal + 30 camera = 50 pts total for Share Camera Post!)
+  cameraLocationBonus: parseInt(process.env.REWARD_CAMERA_LOCATION_POINTS) || 30,
+  maxCameraBonusDaily: parseInt(process.env.REWARD_MAX_CAMERA_BONUS_DAILY) || 300,
 
-  // 3. GPS Accuracy Bonus
-  gpsAccuracyBonusBase: parseInt(process.env.REWARD_GPS_ACCURACY_BASE_POINTS) || 10,
-  gpsAccuracyBonusHigh: parseInt(process.env.REWARD_GPS_ACCURACY_HIGH_POINTS) || 15,
-  maxGpsAccuracyBonusDaily: parseInt(process.env.REWARD_MAX_GPS_ACCURACY_DAILY) || 150,
+  // 3. GPS Accuracy Bonus (High accuracy <= 25m awards 25 points!)
+  gpsAccuracyBonusBase: parseInt(process.env.REWARD_GPS_ACCURACY_BASE_POINTS) || 15,
+  gpsAccuracyBonusHigh: parseInt(process.env.REWARD_GPS_ACCURACY_HIGH_POINTS) || 25,
+  maxGpsAccuracyBonusDaily: parseInt(process.env.REWARD_MAX_GPS_ACCURACY_DAILY) || 250,
 
-  // 4. Hidden Place Discovery
+  // 4. Hidden Place Discovery (New hidden place = 100 points)
   hiddenPlaceDiscoveryPoints: parseInt(process.env.REWARD_HIDDEN_PLACE_POINTS) || 100,
 
-  // 5. Engagement Points (Likes, Saves, Shares)
+  // 5. Daily Check-In Bonus (10 points daily)
+  dailyCheckInPoints: parseInt(process.env.REWARD_DAILY_CHECKIN_POINTS) || 10,
+
+  // 6. Level Up Milestone Bonus (200 points on reaching a new level)
+  levelUpMilestonePoints: parseInt(process.env.REWARD_LEVEL_UP_POINTS) || 200,
+
+  // 7. Community Engagement Points (Likes, Saves, Shares)
   engagementLikePoints: parseInt(process.env.REWARD_LIKE_POINTS) || 1,
   engagementSavePoints: parseInt(process.env.REWARD_SAVE_POINTS) || 2,
   engagementSharePoints: parseInt(process.env.REWARD_SHARE_POINTS) || 3,
@@ -127,13 +133,31 @@ async function awardPoints(userId, eventType, points, refType = null, refId = nu
       // Award Level Badge
       await grantBadgeBySlug(userId, levelInfo.badgeSlug, true);
 
+      // Award Level Up Milestone Bonus (+200 pts) if not already inside a milestone award
+      if (eventType !== 'level_up_milestone' && REWARD_CONFIG.levelUpMilestonePoints > 0) {
+        try {
+          await awardPoints(
+            userId,
+            'level_up_milestone',
+            REWARD_CONFIG.levelUpMilestonePoints,
+            'level',
+            String(levelInfo.level),
+            `Level Up Milestone: Reached Level ${levelInfo.level} (${levelInfo.name})!`,
+            { newLevel: levelInfo.level, levelName: levelInfo.name },
+            { skipBadgeCheck: true }
+          );
+        } catch (mErr) {
+          console.error('[RewardService] Milestone bonus error:', mErr.message);
+        }
+      }
+
       // Send Level Up Notification
       try {
         await createNotification({
           userId: userId,
           type: 'level_up',
           title: '🏆 Level Up!',
-          message: `Congratulations! You are now a ${levelInfo.name} (Level ${levelInfo.level}).`,
+          message: `Congratulations! You are now a ${levelInfo.name} (Level ${levelInfo.level}). Earned +${REWARD_CONFIG.levelUpMilestonePoints} milestone bonus points!`,
         });
       } catch (err) {
         console.error('[RewardService] Error sending level up notification:', err.message);
@@ -282,15 +306,15 @@ async function processPostRewards({ userId, postId, isCameraCapture, locationAcc
     await awardPoints(userId, 'quality_post', REWARD_CONFIG.normalContributionPoints, 'post', postId, 'Normal contribution points', {}, { skipBadgeCheck: true });
   }
 
-  // 3. Camera Location Bonus Check
+  // 3. Camera Location Bonus Check (+30 pts bonus, so 20 normal + 30 camera = 50 pts total!)
   if (isCameraCapture && cameraDailyPoints < REWARD_CONFIG.maxCameraBonusDaily) {
-    await awardPoints(userId, 'camera_location_post', REWARD_CONFIG.cameraLocationBonus, 'post', postId, 'Camera location bonus points', {}, { skipBadgeCheck: true });
+    await awardPoints(userId, 'camera_location_post', REWARD_CONFIG.cameraLocationBonus, 'post', postId, 'Share Camera Post bonus points (+30)', {}, { skipBadgeCheck: true });
   }
 
-  // 4. GPS Accuracy Bonus Check
+  // 4. GPS Accuracy Bonus Check (<= 25m = 25 pts!)
   if (locationAccuracyMeters != null && locationAccuracyMeters <= 100 && accuracyDailyPoints < REWARD_CONFIG.maxGpsAccuracyBonusDaily) {
-    const bonus = locationAccuracyMeters <= 20 ? REWARD_CONFIG.gpsAccuracyBonusHigh : REWARD_CONFIG.gpsAccuracyBonusBase;
-    await awardPoints(userId, 'high_accuracy_location', bonus, 'post', postId, `GPS accuracy bonus (${Math.round(locationAccuracyMeters)}m)`, {}, { skipBadgeCheck: true });
+    const bonus = locationAccuracyMeters <= 25 ? REWARD_CONFIG.gpsAccuracyBonusHigh : REWARD_CONFIG.gpsAccuracyBonusBase;
+    await awardPoints(userId, 'high_accuracy_location', bonus, 'post', postId, `GPS Spot Verification bonus (${Math.round(locationAccuracyMeters)}m)`, {}, { skipBadgeCheck: true });
   }
 
   // 5. Hidden Place Discovery Reward
@@ -310,6 +334,71 @@ async function processPostRewards({ userId, postId, isCameraCapture, locationAcc
 
   // 6. Check special badge eligibility once after all post rewards have processed
   await checkSpecialBadgeEligibility(userId);
+}
+
+/**
+ * Process Daily App Check-In (10 points once per calendar day)
+ */
+async function processDailyCheckIn(userId) {
+  if (!userId) return { success: false, error: 'User ID is required' };
+
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const checkRes = await db.query(
+      `SELECT id, created_at FROM point_transactions 
+       WHERE user_id = $1 AND event_type = 'daily_check_in' AND reference_id = $2 LIMIT 1`,
+      [userId, todayStr]
+    );
+
+    if (checkRes.rows.length > 0) {
+      return {
+        success: true,
+        alreadyClaimed: true,
+        pointsAwarded: 0,
+        message: 'Daily check-in already claimed for today.',
+        claimedAt: checkRes.rows[0].created_at,
+      };
+    }
+
+    const awardRes = await awardPoints(
+      userId,
+      'daily_check_in',
+      REWARD_CONFIG.dailyCheckInPoints,
+      'daily_streak',
+      todayStr,
+      'Daily App Check-In bonus',
+      { date: todayStr }
+    );
+
+    if (!awardRes) {
+      return {
+        success: true,
+        alreadyClaimed: true,
+        pointsAwarded: 0,
+        message: 'Daily check-in already recorded.',
+      };
+    }
+
+    try {
+      await createNotification({
+        userId: userId,
+        type: 'points_earned',
+        title: '🔥 Daily Check-In Complete!',
+        message: `You earned +${REWARD_CONFIG.dailyCheckInPoints} points for visiting Hidely today.`,
+      });
+    } catch (_) {}
+
+    return {
+      success: true,
+      alreadyClaimed: false,
+      pointsAwarded: REWARD_CONFIG.dailyCheckInPoints,
+      totalPoints: awardRes.totalPoints,
+      message: `Earned +${REWARD_CONFIG.dailyCheckInPoints} daily check-in points!`,
+    };
+  } catch (error) {
+    console.error('[RewardService] Daily check-in error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
@@ -351,6 +440,7 @@ async function processEngagementReward({ authorId, actorId, eventType, postId })
 module.exports = {
   awardPoints,
   processPostRewards,
+  processDailyCheckIn,
   processEngagementReward,
   getRewardConfig,
   updateRewardConfig,

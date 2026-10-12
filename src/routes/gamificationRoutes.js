@@ -9,7 +9,9 @@ router.get('/badges', optionalToken, gamificationController.getBadges);
 
 // Authenticated User Gamification
 router.get('/me', verifyToken, gamificationController.getUserGamificationProfile);
+router.post('/checkin', verifyToken, gamificationController.dailyCheckIn);
 router.get('/points/history', verifyToken, gamificationController.getPointHistory);
 router.post('/badges/featured', verifyToken, gamificationController.setFeaturedBadge);
 
 module.exports = router;
+
