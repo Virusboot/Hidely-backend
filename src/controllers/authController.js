@@ -449,4 +449,53 @@ exports.verifyEmailOTP = async (req, res) => {
   }
 };
 
+/**
+ * Check Email or Username Availability (Sign up pre-validation)
+ * POST /api/auth/check-availability
+ */
+exports.checkAvailability = async (req, res) => {
+  const { email, username } = req.body;
+
+  try {
+    if (email) {
+      const emailClean = email.toLowerCase().trim();
+      const userCheck = await db.query(
+        'SELECT id, is_verified FROM users WHERE email = $1',
+        [emailClean]
+      );
+      if (userCheck.rows.length > 0 && userCheck.rows[0].is_verified) {
+        return res.status(400).json({
+          available: false,
+          error: 'An account already exists with this email.',
+          field: 'email',
+        });
+      }
+    }
+
+    if (username) {
+      const usernameClean = username.toLowerCase().trim();
+      const userCheck = await db.query(
+        'SELECT id, is_verified FROM users WHERE username = $1',
+        [usernameClean]
+      );
+      if (userCheck.rows.length > 0 && userCheck.rows[0].is_verified) {
+        return res.status(400).json({
+          available: false,
+          error: 'Username is already taken.',
+          field: 'username',
+        });
+      }
+    }
+
+    return res.status(200).json({
+      available: true,
+      message: 'Available.',
+    });
+  } catch (error) {
+    console.error('Error in checkAvailability:', error);
+    return res.status(500).json({ error: 'Server error checking availability.' });
+  }
+};
+
+
 

@@ -13,6 +13,9 @@ const {
 // Registration route
 router.post('/register', registerLimiter, authController.register);
 
+// Check Email or Username availability
+router.post('/check-availability', authController.checkAvailability);
+
 // Send Email Verification OTP (during signup)
 router.post('/send-email-otp', otpLimiter, authController.sendEmailOTP);
 
