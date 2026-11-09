@@ -364,3 +364,89 @@ exports.changePassword = async (req, res) => {
   }
 };
 
+/**
+ * Send OTP for Email Verification (Sign up)
+ * POST /api/auth/send-email-otp
+ */
+exports.sendEmailOTP = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Please enter your email address.' });
+  }
+
+  const emailLower = email.toLowerCase().trim();
+
+  try {
+    // Check if an account already exists with this email
+    const userCheck = await db.query('SELECT id, is_verified FROM users WHERE email = $1', [emailLower]);
+    if (userCheck.rows.length > 0 && userCheck.rows[0].is_verified) {
+      return res.status(400).json({ error: 'An account already exists with this email.' });
+    }
+
+    // Clean up any old OTPs for this email
+    await db.query('DELETE FROM otps WHERE email = $1', [emailLower]);
+
+    // Generate a 4-digit OTP code
+    const otpCode = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await db.query(
+      'INSERT INTO otps (email, otp_code, expires_at) VALUES ($1, $2, $3)',
+      [emailLower, otpCode, expiresAt]
+    );
+
+    // Send email via Resend / SMTP
+    sendOTPEmail(emailLower, otpCode).catch(err => {
+      console.error('[Resend/SMTP] Error sending signup verification OTP:', err);
+    });
+
+    console.log(`[Signup OTP] Code for ${emailLower}: ${otpCode}`);
+
+    return res.status(200).json({
+      message: 'Verification code sent to your email.',
+      dev_otp: otpCode,
+    });
+  } catch (error) {
+    console.error('Error in sendEmailOTP:', error);
+    return res.status(500).json({ error: 'Failed to send verification code. Please try again.' });
+  }
+};
+
+/**
+ * Verify Email OTP (Sign up step)
+ * POST /api/auth/verify-email-otp
+ */
+exports.verifyEmailOTP = async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ error: 'Please enter email and verification code.' });
+  }
+
+  const emailLower = email.toLowerCase().trim();
+
+  try {
+    const otpResult = await db.query(
+      'SELECT * FROM otps WHERE email = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [emailLower]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Code expired or not found. Please request a new one.' });
+    }
+
+    if (otpResult.rows[0].otp_code !== otp.trim()) {
+      return res.status(400).json({ error: 'Invalid verification code. Please check and try again.' });
+    }
+
+    return res.status(200).json({
+      message: 'Email verified successfully!',
+    });
+  } catch (error) {
+    console.error('Error in verifyEmailOTP:', error);
+    return res.status(500).json({ error: 'Verification failed. Please try again.' });
+  }
+};
+
+

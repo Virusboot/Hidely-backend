@@ -13,6 +13,12 @@ const {
 // Registration route
 router.post('/register', registerLimiter, authController.register);
 
+// Send Email Verification OTP (during signup)
+router.post('/send-email-otp', otpLimiter, authController.sendEmailOTP);
+
+// Verify Email OTP (during signup)
+router.post('/verify-email-otp', otpLimiter, authController.verifyEmailOTP);
+
 // OTP Verification route
 router.post('/verify-otp', otpLimiter, authController.verifyOTP);
 
