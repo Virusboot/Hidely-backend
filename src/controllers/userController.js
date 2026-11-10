@@ -1,6 +1,15 @@
 const db = require('../config/db');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { ensureUserBlocksTable, getBlockStatus, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
+const {
+  ensureTagMentionSchema,
+  normalizeAudiencePolicy,
+  parseStrictAudiencePolicy,
+  evaluateTagMentionTargets,
+  buildRestrictionErrorMessage,
+  tagMentionCapabilityColumnsSql,
+  stripTagFromCaptionSuffix,
+} = require('../utils/privacyHelper');
 
 /**
  * Get current user profile details
@@ -472,7 +481,7 @@ exports.getFollowers = async (req, res) => {
  */
 exports.getLeaderboard = async (req, res) => {
   try {
-    await ensureUserBlocksTable();
+    await ensureTagMentionSchema();
     const currentUserId = req.user ? req.user.id : null;
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
 
@@ -489,7 +498,8 @@ exports.getLeaderboard = async (req, res) => {
           LOWER(u.username) IN ('hidely_official', 'hidely') 
           OR (SELECT COUNT(*)::int FROM posts p_sub WHERE p_sub.user_id = u.id) >= 50 
           OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
-        ) AS is_verified
+        ) AS is_verified,
+        ${tagMentionCapabilityColumnsSql('$1', 'u')}
       FROM users u
       WHERE u.username IS NOT NULL AND u.username != '' AND ${blockFilter}
       ORDER BY points DESC, u.id ASC`,
@@ -516,7 +526,7 @@ exports.searchUsers = async (req, res) => {
       return res.status(200).json({ users: [] });
     }
 
-    await ensureUserBlocksTable();
+    await ensureTagMentionSchema();
     const currentUserId = req.user ? req.user.id : null;
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
 
@@ -532,7 +542,8 @@ exports.searchUsers = async (req, res) => {
           LOWER(u.username) IN ('hidely_official', 'hidely') 
           OR (SELECT COUNT(*)::int FROM posts p_sub WHERE p_sub.user_id = u.id) >= 50 
           OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
-        ) AS is_verified
+        ) AS is_verified,
+        ${tagMentionCapabilityColumnsSql('$2', 'u')}
       FROM users u
       WHERE (u.username ILIKE $1 OR u.name ILIKE $1) AND ${blockFilter}
       ORDER BY u.id DESC
@@ -680,4 +691,328 @@ exports.unblockUser = async (req, res) => {
     console.error('Error unblocking user:', error);
     return res.status(500).json({ error: 'Server error unblocking user.' });
   }
+};
+
+/**
+ * Get current user's Tags & Mentions privacy settings
+ * GET /api/users/privacy/tags-mentions
+ */
+exports.getTagMentionSettings = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await ensureTagMentionSchema();
+    const result = await db.query(
+      `SELECT
+        COALESCE(allow_tags_from, 'everyone') AS allow_tags_from,
+        COALESCE(allow_mentions_from, 'everyone') AS allow_mentions_from,
+        COALESCE(manually_approve_tags, FALSE) AS manually_approve_tags
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const row = result.rows[0];
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
+    const pendingRes = await db.query(
+      `SELECT COUNT(*)::int AS pending_count
+       FROM post_tags pt
+       INNER JOIN posts p ON pt.post_id = p.id
+       INNER JOIN users u ON p.user_id = u.id
+       WHERE pt.tagged_user_id = $1
+         AND pt.status = 'pending'
+         AND ${blockFilter}`,
+      [userId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      settings: {
+        allow_tags_from: normalizeAudiencePolicy(row.allow_tags_from),
+        allow_mentions_from: normalizeAudiencePolicy(row.allow_mentions_from),
+        manually_approve_tags: row.manually_approve_tags === true,
+      },
+      pending_tags_count: pendingRes.rows[0]?.pending_count || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching tag/mention settings:', error);
+    return res.status(500).json({ error: 'Server error fetching tags and mentions settings.' });
+  }
+};
+
+/**
+ * Update current user's Tags & Mentions privacy settings
+ * PUT /api/users/privacy/tags-mentions
+ */
+exports.updateTagMentionSettings = async (req, res) => {
+  const userId = req.user.id;
+  const { allow_tags_from, allow_mentions_from, manually_approve_tags } = req.body || {};
+
+  try {
+    await ensureTagMentionSchema();
+
+    const sets = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (allow_tags_from !== undefined) {
+      const parsed = parseStrictAudiencePolicy(allow_tags_from);
+      if (!parsed) {
+        return res.status(400).json({
+          error: "Invalid allow_tags_from value. Expected 'everyone', 'following', or 'no_one'.",
+        });
+      }
+      sets.push(`allow_tags_from = $${paramIndex}`);
+      params.push(parsed);
+      paramIndex++;
+    }
+
+    if (allow_mentions_from !== undefined) {
+      const parsed = parseStrictAudiencePolicy(allow_mentions_from);
+      if (!parsed) {
+        return res.status(400).json({
+          error: "Invalid allow_mentions_from value. Expected 'everyone', 'following', or 'no_one'.",
+        });
+      }
+      sets.push(`allow_mentions_from = $${paramIndex}`);
+      params.push(parsed);
+      paramIndex++;
+    }
+
+    if (manually_approve_tags !== undefined) {
+      let boolVal = null;
+      if (typeof manually_approve_tags === 'boolean') {
+        boolVal = manually_approve_tags;
+      } else if (typeof manually_approve_tags === 'string') {
+        const lower = manually_approve_tags.trim().toLowerCase();
+        if (lower === 'true' || lower === '1') boolVal = true;
+        if (lower === 'false' || lower === '0') boolVal = false;
+      } else if (manually_approve_tags === 1 || manually_approve_tags === 0) {
+        boolVal = manually_approve_tags === 1;
+      }
+
+      if (boolVal === null) {
+        return res.status(400).json({
+          error: 'Invalid manually_approve_tags value. Expected boolean.',
+        });
+      }
+
+      sets.push(`manually_approve_tags = $${paramIndex}`);
+      params.push(boolVal);
+      paramIndex++;
+    }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ error: 'No tag/mention settings provided.' });
+    }
+
+    params.push(userId);
+    const updateRes = await db.query(
+      `UPDATE users
+       SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $${paramIndex}
+       RETURNING
+         COALESCE(allow_tags_from, 'everyone') AS allow_tags_from,
+         COALESCE(allow_mentions_from, 'everyone') AS allow_mentions_from,
+         COALESCE(manually_approve_tags, FALSE) AS manually_approve_tags`,
+      params
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const row = updateRes.rows[0];
+    return res.status(200).json({
+      success: true,
+      message: 'Tags and mentions settings updated successfully.',
+      settings: {
+        allow_tags_from: normalizeAudiencePolicy(row.allow_tags_from),
+        allow_mentions_from: normalizeAudiencePolicy(row.allow_mentions_from),
+        manually_approve_tags: row.manually_approve_tags === true,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating tag/mention settings:', error);
+    return res.status(500).json({ error: 'Server error updating tags and mentions settings.' });
+  }
+};
+
+/**
+ * Check whether current user can tag or @mention the supplied usernames
+ * POST /api/users/privacy/check-tags-mentions
+ * Body: { usernames: string[], mode: 'tag' | 'mention' }
+ */
+exports.checkTagMentionEligibility = async (req, res) => {
+  const actorId = req.user.id;
+  const { usernames, mode } = req.body || {};
+  const cleanMode = mode === 'tag' ? 'tag' : 'mention';
+
+  try {
+    const evalResult = await evaluateTagMentionTargets({
+      actorId,
+      usernames: usernames || [],
+      mode: cleanMode,
+    });
+
+    const restricted = evalResult.rejectedUsers;
+    return res.status(200).json({
+      success: true,
+      mode: cleanMode,
+      allowed: evalResult.allowedUsers,
+      restricted,
+      not_found: evalResult.notFoundUsernames,
+      all_allowed: restricted.length === 0,
+      message: restricted.length > 0 ? buildRestrictionErrorMessage(restricted, cleanMode) : null,
+    });
+  } catch (error) {
+    console.error('Error checking tag/mention eligibility:', error);
+    return res.status(500).json({ error: 'Server error checking eligibility.' });
+  }
+};
+
+/**
+ * Get all posts in which the authenticated user is tagged (pending approval + approved)
+ * GET /api/users/tags
+ */
+exports.getTaggedPosts = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await ensureTagMentionSchema();
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
+
+    const result = await db.query(
+      `SELECT
+        pt.id AS tag_id,
+        pt.post_id,
+        pt.status AS tag_status,
+        pt.created_at AS tagged_at,
+        p.caption,
+        p.image_url,
+        p.location,
+        p.category,
+        p.likes_count,
+        p.created_at,
+        u.id AS author_id,
+        u.name AS author_name,
+        u.username AS author_username,
+        u.profile_picture AS author_profile_picture,
+        COALESCE(
+          (SELECT TRUE FROM post_likes WHERE post_id = p.id AND user_id = $1 LIMIT 1),
+          FALSE
+        ) AS is_liked,
+        COALESCE(
+          (SELECT TRUE FROM post_bookmarks WHERE post_id = p.id AND user_id = $1 LIMIT 1),
+          FALSE
+        ) AS is_bookmarked,
+        COALESCE(
+          (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id),
+          0
+        ) AS comments_count
+       FROM post_tags pt
+       INNER JOIN posts p ON pt.post_id = p.id
+       INNER JOIN users u ON p.user_id = u.id
+       WHERE pt.tagged_user_id = $1 AND ${blockFilter}
+       ORDER BY (CASE WHEN pt.status = 'pending' THEN 0 ELSE 1 END) ASC, pt.created_at DESC`,
+      [userId]
+    );
+
+    const pendingCount = result.rows.filter((r) => r.tag_status === 'pending').length;
+
+    return res.status(200).json({
+      success: true,
+      tags: result.rows,
+      pending_count: pendingCount,
+    });
+  } catch (error) {
+    console.error('Error fetching tagged posts:', error);
+    return res.status(500).json({ error: 'Server error fetching tagged posts.' });
+  }
+};
+
+/**
+ * Approve or remove a post tag for the authenticated user
+ * PATCH /api/users/tags/:postId  { action: 'approve' | 'remove' }
+ */
+exports.respondToPostTag = async (req, res) => {
+  const userId = req.user.id;
+  const postId = parseInt(req.params.postId, 10);
+  const action = ((req.body && req.body.action) || '').toString().trim().toLowerCase();
+
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'Invalid post ID.' });
+  }
+
+  if (action !== 'approve' && action !== 'remove') {
+    return res.status(400).json({ error: "Invalid action. Expected 'approve' or 'remove'." });
+  }
+
+  try {
+    await ensureTagMentionSchema();
+
+    const tagCheck = await db.query(
+      `SELECT pt.id, pt.status, p.caption, u.username
+       FROM post_tags pt
+       INNER JOIN posts p ON p.id = pt.post_id
+       INNER JOIN users u ON u.id = pt.tagged_user_id
+       WHERE pt.post_id = $1 AND pt.tagged_user_id = $2
+       LIMIT 1`,
+      [postId, userId]
+    );
+
+    if (tagCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Tag entry not found for this post.' });
+    }
+
+    const existing = tagCheck.rows[0];
+
+    if (action === 'approve') {
+      await db.query(
+        `UPDATE post_tags SET status = 'approved' WHERE post_id = $1 AND tagged_user_id = $2`,
+        [postId, userId]
+      );
+      return res.status(200).json({
+        success: true,
+        message: 'Tag approved.',
+        status: 'approved',
+        post_id: postId,
+      });
+    }
+
+    // Remove tag
+    await db.query(
+      `DELETE FROM post_tags WHERE post_id = $1 AND tagged_user_id = $2`,
+      [postId, userId]
+    );
+
+    if (existing.caption && existing.username) {
+      const cleanedCaption = stripTagFromCaptionSuffix(existing.caption, existing.username);
+      if (cleanedCaption !== existing.caption) {
+        await db.query('UPDATE posts SET caption = $1 WHERE id = $2', [cleanedCaption, postId]);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Tag removed from post.',
+      status: 'removed',
+      post_id: postId,
+    });
+  } catch (error) {
+    console.error('Error updating post tag:', error);
+    return res.status(500).json({ error: 'Server error updating post tag.' });
+  }
+};
+
+/**
+ * Remove a tag on a post where the current user was tagged
+ * DELETE /api/users/tags/:postId
+ */
+exports.removePostTag = async (req, res) => {
+  req.body = { ...(req.body || {}), action: 'remove' };
+  return exports.respondToPostTag(req, res);
 };

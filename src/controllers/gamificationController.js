@@ -1,13 +1,14 @@
 const db = require('../config/db');
 const rewardService = require('../services/rewardService');
-const { ensureUserBlocksTable, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
+const { isNotMutuallyBlockedSql } = require('../utils/blockHelper');
+const { ensureTagMentionSchema, tagMentionCapabilityColumnsSql } = require('../utils/privacyHelper');
 
 /**
  * GET /api/gamification/leaderboard?period=weekly|monthly|all_time&limit=100&offset=0
  */
 exports.getLeaderboard = async (req, res) => {
   try {
-    await ensureUserBlocksTable();
+    await ensureTagMentionSchema();
     const currentUserId = req.user && req.user.id ? req.user.id : null;
     const period = (req.query.period || 'all_time').toLowerCase();
     let timeClause = '';
@@ -55,7 +56,8 @@ exports.getLeaderboard = async (req, res) => {
           b.name as featured_badge_name,
           b.icon as featured_badge_icon,
           b.rarity as featured_badge_rarity,
-          b.category as featured_badge_category
+          b.category as featured_badge_category,
+          ${tagMentionCapabilityColumnsSql('$3', 'u')}
         FROM users u
         LEFT JOIN badges b ON b.id = u.featured_badge_id
         WHERE u.username IS NOT NULL AND u.username != '' AND ${blockFilter}
@@ -81,7 +83,8 @@ exports.getLeaderboard = async (req, res) => {
           b.name as featured_badge_name,
           b.icon as featured_badge_icon,
           b.rarity as featured_badge_rarity,
-          b.category as featured_badge_category
+          b.category as featured_badge_category,
+          ${tagMentionCapabilityColumnsSql('$3', 'u')}
         FROM users u
         LEFT JOIN point_transactions pt ON pt.user_id = u.id ${intervalCondition}
         LEFT JOIN badges b ON b.id = u.featured_badge_id
@@ -110,6 +113,10 @@ exports.getLeaderboard = async (req, res) => {
         level: levelInfo.level,
         levelName: levelInfo.name,
         rank_change: index === 0 ? '↑ 1' : (index % 2 === 0 ? '↑ 2' : '—'),
+        allow_tags_from: row.allow_tags_from || 'everyone',
+        allow_mentions_from: row.allow_mentions_from || 'everyone',
+        can_be_tagged: row.can_be_tagged !== false,
+        can_be_mentioned: row.can_be_mentioned !== false,
         featured_badge: row.featured_badge_id ? {
           id: row.featured_badge_id,
           name: row.featured_badge_name,

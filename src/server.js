@@ -182,7 +182,10 @@ const startServer = async () => {
         ADD COLUMN IF NOT EXISTS current_rank INTEGER DEFAULT 0,
         ADD COLUMN IF NOT EXISTS explorer_score DOUBLE PRECISION DEFAULT 0,
         ADD COLUMN IF NOT EXISTS last_points_updated_at TIMESTAMP WITH TIME ZONE,
-        ADD COLUMN IF NOT EXISTS featured_badge_id INTEGER;
+        ADD COLUMN IF NOT EXISTS featured_badge_id INTEGER,
+        ADD COLUMN IF NOT EXISTS allow_tags_from VARCHAR(20) DEFAULT 'everyone',
+        ADD COLUMN IF NOT EXISTS allow_mentions_from VARCHAR(20) DEFAULT 'everyone',
+        ADD COLUMN IF NOT EXISTS manually_approve_tags BOOLEAN DEFAULT FALSE;
 
         CREATE TABLE IF NOT EXISTS user_blocks (
           blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -192,6 +195,18 @@ const startServer = async () => {
         );
         CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks (blocker_id);
         CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks (blocked_id);
+
+        CREATE TABLE IF NOT EXISTS post_tags (
+          id SERIAL PRIMARY KEY,
+          post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+          tagged_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          tagged_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          status VARCHAR(20) NOT NULL DEFAULT 'approved',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (post_id, tagged_user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_post_tags_tagged_user ON post_tags (tagged_user_id, status);
+        CREATE INDEX IF NOT EXISTS idx_post_tags_post_id ON post_tags (post_id, status);
       `);
       console.log('[Schema] All required database tables & columns verified.');
     } catch (schemaErr) {

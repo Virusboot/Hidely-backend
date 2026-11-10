@@ -32,4 +32,12 @@ router.get('/blocked', authMiddleware, userController.getBlockedUsers);
 router.post('/block/:identifier', authMiddleware, userController.blockUser);
 router.delete('/block/:identifier', authMiddleware, userController.unblockUser);
 
+// Tags & Mentions privacy settings & post tag approvals (private)
+router.get('/privacy/tags-mentions', authMiddleware, userController.getTagMentionSettings);
+router.put('/privacy/tags-mentions', authMiddleware, userController.updateTagMentionSettings);
+router.post('/privacy/check-tags-mentions', authMiddleware, userController.checkTagMentionEligibility);
+router.get('/tags', authMiddleware, userController.getTaggedPosts);
+router.patch('/tags/:postId', authMiddleware, userController.respondToPostTag);
+router.delete('/tags/:postId', authMiddleware, userController.removePostTag);
+
 module.exports = router;

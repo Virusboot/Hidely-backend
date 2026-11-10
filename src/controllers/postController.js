@@ -1,6 +1,44 @@
+const fs = require('fs');
 const db = require('../config/db');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { ensureUserBlocksTable, getBlockStatus, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
+const {
+  ensureTagMentionSchema,
+  normalizeUsernameList,
+  extractMentionUsernames,
+  evaluateTagMentionTargets,
+  buildRestrictionErrorMessage,
+} = require('../utils/privacyHelper');
+
+function approvedTaggedUsersSql(postIdExpr, currentUserParam) {
+  return `COALESCE(
+    (
+      SELECT json_agg(
+        json_build_object(
+          'id', tu.id,
+          'name', tu.name,
+          'username', tu.username,
+          'profile_picture', tu.profile_picture
+        )
+        ORDER BY pt.created_at ASC
+      )
+      FROM post_tags pt
+      INNER JOIN users tu ON pt.tagged_user_id = tu.id
+      WHERE pt.post_id = ${postIdExpr}
+        AND pt.status = 'approved'
+        AND ${isNotMutuallyBlockedSql('tu.id', currentUserParam)}
+    ),
+    '[]'::json
+  ) AS tagged_users`;
+}
+
+function cleanupTempFile(file) {
+  if (file && file.path && fs.existsSync(file.path)) {
+    try {
+      fs.unlinkSync(file.path);
+    } catch (_) {}
+  }
+}
 
 /**
  * Create a new travel post
@@ -24,7 +62,8 @@ exports.createPost = async (req, res) => {
     state,
     country,
     ai_confidence,
-    duplicate_cluster_id
+    duplicate_cluster_id,
+    tagged_usernames
   } = req.body;
 
   if (!req.file) {
@@ -32,6 +71,40 @@ exports.createPost = async (req, res) => {
   }
 
   try {
+    await ensureTagMentionSchema();
+
+    const requestedTaggedUsernames = normalizeUsernameList(tagged_usernames);
+    const taggedSet = new Set(requestedTaggedUsernames);
+    const captionMentions = extractMentionUsernames(caption || '').filter((u) => !taggedSet.has(u));
+
+    const tagEval = await evaluateTagMentionTargets({
+      actorId: userId,
+      usernames: requestedTaggedUsernames,
+      mode: 'tag',
+    });
+    if (tagEval.rejectedUsers.length > 0) {
+      cleanupTempFile(req.file);
+      return res.status(403).json({
+        error: buildRestrictionErrorMessage(tagEval.rejectedUsers, 'tag'),
+        tag_restricted: true,
+        restricted_usernames: tagEval.rejectedUsers.map((u) => u.username).filter(Boolean),
+      });
+    }
+
+    const mentionEval = await evaluateTagMentionTargets({
+      actorId: userId,
+      usernames: captionMentions,
+      mode: 'mention',
+    });
+    if (mentionEval.rejectedUsers.length > 0) {
+      cleanupTempFile(req.file);
+      return res.status(403).json({
+        error: buildRestrictionErrorMessage(mentionEval.rejectedUsers, 'mention'),
+        mention_restricted: true,
+        restricted_usernames: mentionEval.rejectedUsers.map((u) => u.username).filter(Boolean),
+      });
+    }
+
     // Upload the file to Cloudinary in the posts folder
     const imageUrl = await uploadToCloudinary(req.file.path, 'hidely/posts');
 
@@ -227,32 +300,103 @@ exports.createPost = async (req, res) => {
       console.error('Error processing post rewards:', rewardErr.message);
     }
 
-    // Send notifications to all followers (excluding author)
+    // Persist post tags and send tag/mention/follower notifications
+    const approvedTags = [];
+    const pendingTagUsernames = [];
+    const directNotifiedIds = new Set();
+    let authorName = 'Someone';
+
     try {
       const authorResult = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
-      const authorName = authorResult.rows[0]?.name || authorResult.rows[0]?.username || 'Someone';
+      authorName = authorResult.rows[0]?.name || authorResult.rows[0]?.username || 'Someone';
+    } catch (_) {}
 
+    for (const taggedUser of tagEval.allowedUsers) {
+      const isSelf = parseInt(taggedUser.id, 10) === parseInt(userId, 10);
+      const tagStatus = !isSelf && taggedUser.manually_approve_tags ? 'pending' : 'approved';
+      try {
+        await db.query(
+          `INSERT INTO post_tags (post_id, tagged_user_id, tagged_by_user_id, status)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (post_id, tagged_user_id) DO UPDATE SET status = EXCLUDED.status`,
+          [post.id, taggedUser.id, userId, tagStatus]
+        );
+
+        if (tagStatus === 'approved') {
+          approvedTags.push({
+            id: taggedUser.id,
+            name: taggedUser.name,
+            username: taggedUser.username,
+            profile_picture: taggedUser.profile_picture,
+          });
+        } else if (taggedUser.username) {
+          pendingTagUsernames.push(taggedUser.username);
+        }
+
+        if (!isSelf) {
+          directNotifiedIds.add(taggedUser.id);
+          const notifType = tagStatus === 'pending' ? 'tag_request' : 'tag';
+          const notifText = tagStatus === 'pending'
+            ? `${authorName} tagged you in a post. Tap to review.`
+            : `${authorName} tagged you in a post.`;
+          await db.query(
+            `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [taggedUser.id, userId, notifType, post.id, notifText]
+          );
+        }
+      } catch (tagErr) {
+        console.error('Error recording post tag:', tagErr.message);
+      }
+    }
+
+    for (const mentionedUser of mentionEval.allowedUsers) {
+      const isSelf = parseInt(mentionedUser.id, 10) === parseInt(userId, 10);
+      if (isSelf || directNotifiedIds.has(mentionedUser.id)) continue;
+      directNotifiedIds.add(mentionedUser.id);
+      try {
+        await db.query(
+          `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
+           VALUES ($1, $2, 'mention', $3, $4)`,
+          [mentionedUser.id, userId, post.id, `${authorName} mentioned you in a caption.`]
+        );
+      } catch (mentionErr) {
+        console.error('Error sending caption mention notification:', mentionErr.message);
+      }
+    }
+
+    // Send notifications to all remaining followers (excluding author & already notified users)
+    try {
+      const excludedIds = Array.from(directNotifiedIds);
       await db.query(
         `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
          SELECT follower_id, $1, 'new_post', $2, $3
          FROM user_follows
          WHERE following_id = $1 AND follower_id != $1
+           AND NOT (follower_id = ANY($4::int[]))
            AND ${isNotMutuallyBlockedSql('follower_id', '$1')}`,
         [
           userId,
           post.id,
-          `${authorName} posted a new travel post.`
+          `${authorName} posted a new travel post.`,
+          excludedIds
         ]
       );
     } catch (notifErr) {
       console.error('Error sending post notifications:', notifErr.message);
     }
 
+    post.tagged_users = approvedTags;
+
     return res.status(201).json({
-      message: 'Post created successfully.',
+      message: pendingTagUsernames.length > 0
+        ? 'Post created. Some tags are pending approval.'
+        : 'Post created successfully.',
       post,
+      pending_tag_usernames: pendingTagUsernames,
     });
   } catch (error) {
+    cleanupTempFile(req.file);
     console.error('Error creating post:', error);
     return res.status(500).json({ error: error.message || 'Server error creating post.' });
   }
@@ -272,7 +416,7 @@ exports.getFeed = async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
 
   try {
-    await ensureUserBlocksTable();
+    await ensureTagMentionSchema();
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
 
     const feedResult = await db.query(
@@ -300,7 +444,8 @@ exports.getFeed = async (req, res) => {
         ) AS is_verified,
         EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) AS is_liked,
         EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND user_id = $1) AS is_bookmarked,
-        (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id) AS comments_count
+        (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id) AS comments_count,
+        ${approvedTaggedUsersSql('p.id', '$1')}
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
       WHERE ${blockFilter}
@@ -511,6 +656,7 @@ exports.getUserPosts = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    await ensureTagMentionSchema();
     if (currentUserId && parseInt(currentUserId, 10) !== userId) {
       const blockStatus = await getBlockStatus(currentUserId, userId);
       if (blockStatus.blocked) {
@@ -538,7 +684,8 @@ exports.getUserPosts = async (req, res) => {
         COALESCE(
           (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id), 
           0
-        ) AS comments_count
+        ) AS comments_count,
+        ${approvedTaggedUsersSql('p.id', '$2')}
       FROM posts p 
       WHERE p.user_id = $1 
       ORDER BY p.created_at DESC`,
@@ -615,6 +762,8 @@ exports.addComment = async (req, res) => {
   }
 
   try {
+    await ensureTagMentionSchema();
+
     const postResult = await db.query('SELECT user_id FROM posts WHERE id = $1', [postId]);
     if (postResult.rows.length === 0) {
       return res.status(404).json({ error: 'Post not found.' });
@@ -626,6 +775,20 @@ exports.addComment = async (req, res) => {
       if (blockStatus.blocked) {
         return res.status(403).json({ error: 'Cannot comment on this post.', blocked: true });
       }
+    }
+
+    const mentionHandles = extractMentionUsernames(text);
+    const mentionEval = await evaluateTagMentionTargets({
+      actorId: userId,
+      usernames: mentionHandles,
+      mode: 'mention',
+    });
+    if (mentionEval.rejectedUsers.length > 0) {
+      return res.status(403).json({
+        error: buildRestrictionErrorMessage(mentionEval.rejectedUsers, 'mention'),
+        mention_restricted: true,
+        restricted_usernames: mentionEval.rejectedUsers.map((u) => u.username).filter(Boolean),
+      });
     }
 
     const result = await db.query(
@@ -647,9 +810,11 @@ exports.addComment = async (req, res) => {
       user_id: userId,
     };
 
+    const actorName = userResult.rows[0].name || userResult.rows[0].username || 'Someone';
+    const snippet = `${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}`;
+
     // Send comment notification to post author if commented by someone else
     if (postCreator !== userId) {
-      const actorName = userResult.rows[0].name || userResult.rows[0].username;
       await db.query(
         `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
          VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -659,9 +824,30 @@ exports.addComment = async (req, res) => {
           'comment',
           postId,
           result.rows[0].id,
-          `${actorName} commented: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"`
+          `${actorName} commented: "${snippet}"`
         ]
       );
+    }
+
+    // Send mention notifications to mentioned users (excluding self & postCreator who received comment notification)
+    for (const mentionedUser of mentionEval.allowedUsers) {
+      const targetId = parseInt(mentionedUser.id, 10);
+      if (targetId === parseInt(userId, 10) || targetId === parseInt(postCreator, 10)) continue;
+      try {
+        await db.query(
+          `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
+           VALUES ($1, $2, 'mention', $3, $4, $5)`,
+          [
+            targetId,
+            userId,
+            postId,
+            result.rows[0].id,
+            `${actorName} mentioned you in a comment: "${snippet}"`
+          ]
+        );
+      } catch (mentionErr) {
+        console.error('Error sending comment mention notification:', mentionErr.message);
+      }
     }
 
     return res.status(201).json({
@@ -807,7 +993,7 @@ exports.getPostById = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
-    await ensureUserBlocksTable();
+    await ensureTagMentionSchema();
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
 
     const postResult = await db.query(
@@ -834,7 +1020,8 @@ exports.getPostById = async (req, res) => {
         COALESCE(
           (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id), 
           0
-        ) AS comments_count
+        ) AS comments_count,
+        ${approvedTaggedUsersSql('p.id', '$2')}
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
       WHERE p.id = $1 AND ${blockFilter}`,
@@ -884,7 +1071,7 @@ exports.getExplorePosts = async (req, res) => {
       parsedOffset = off;
     }
 
-    await ensureUserBlocksTable();
+    await ensureTagMentionSchema();
     const exploreBlockFilter = isNotMutuallyBlockedSql('u.id', '$1');
 
     let query = `
@@ -989,7 +1176,8 @@ exports.getExplorePosts = async (req, res) => {
         tp.author_profile_picture,
         COALESCE(liked.is_liked, FALSE) AS is_liked,
         COALESCE(bookmarked.is_bookmarked, FALSE) AS is_bookmarked,
-        COALESCE(comments.comments_count, 0)::int AS comments_count
+        COALESCE(comments.comments_count, 0)::int AS comments_count,
+        ${approvedTaggedUsersSql('tp.id', '$1')}
       FROM target_posts tp
       LEFT JOIN LATERAL (
         SELECT TRUE AS is_liked
@@ -1050,6 +1238,7 @@ exports.deletePost = async (req, res) => {
     await db.query('DELETE FROM post_bookmarks WHERE post_id = $1', [postId]);
     await db.query('DELETE FROM post_comments WHERE post_id = $1', [postId]);
     await db.query('DELETE FROM notifications WHERE post_id = $1', [postId]);
+    await db.query('DELETE FROM post_tags WHERE post_id = $1', [postId]).catch(() => {});
     await db.query('DELETE FROM posts WHERE id = $1', [postId]);
 
     return res.status(200).json({ message: 'Post deleted successfully.' });
