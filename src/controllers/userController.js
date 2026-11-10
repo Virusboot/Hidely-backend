@@ -211,7 +211,10 @@ exports.getCreatorProfile = async (req, res) => {
         p.image_url, 
         p.location, 
         p.category, 
-        p.likes_count, 
+        GREATEST(
+          COALESCE(p.likes_count, 0),
+          (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+        )::int AS likes_count, 
         p.created_at,
         COALESCE(
           (SELECT TRUE FROM post_likes WHERE post_id = p.id AND user_id = $2 LIMIT 1), 
@@ -895,7 +898,10 @@ exports.getTaggedPosts = async (req, res) => {
         p.image_url,
         p.location,
         p.category,
-        p.likes_count,
+        GREATEST(
+          COALESCE(p.likes_count, 0),
+          (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+        )::int AS likes_count,
         p.created_at,
         u.id AS author_id,
         u.name AS author_name,

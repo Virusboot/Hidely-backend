@@ -464,6 +464,7 @@ exports.getFeed = async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
 
   try {
+    await ensureUserBlocksTable();
     await ensureTagMentionSchema();
     await ensurePostLocationColumns();
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
@@ -484,7 +485,10 @@ exports.getFeed = async (req, res) => {
         p.city,
         p.state,
         p.country,
-        p.likes_count, 
+        GREATEST(
+          COALESCE(p.likes_count, 0),
+          (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+        )::int AS likes_count, 
         p.created_at,
         u.id AS author_id,
         u.name AS author_name,
@@ -526,17 +530,21 @@ exports.getFeed = async (req, res) => {
  * POST /api/posts/:id/like
  */
 exports.toggleLike = async (req, res) => {
-  const userId = req.user.id;
-  const postId = parseInt(req.params.id);
+  const userId = parseInt(req.user.id, 10);
+  const postId = parseInt(req.params.id, 10);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: 'Invalid post ID.' });
+  }
 
   try {
     // Check if post exists
-    const postResult = await db.query('SELECT * FROM posts WHERE id = $1', [postId]);
+    const postResult = await db.query('SELECT id, user_id, COALESCE(likes_count, 0)::int AS likes_count FROM posts WHERE id = $1', [postId]);
     if (postResult.rows.length === 0) {
       return res.status(404).json({ error: 'Post not found.' });
     }
 
-    const postCreator = postResult.rows[0].user_id;
+    const postCreator = parseInt(postResult.rows[0].user_id, 10);
     if (postCreator !== userId) {
       const blockStatus = await getBlockStatus(userId, postCreator);
       if (blockStatus.blocked) {
@@ -545,52 +553,75 @@ exports.toggleLike = async (req, res) => {
     }
 
     // Check if user already liked the post
-    const likeCheck = await db.query('SELECT * FROM post_likes WHERE user_id = $1 AND post_id = $2', [
+    const likeCheck = await db.query('SELECT id FROM post_likes WHERE user_id = $1 AND post_id = $2', [
       userId,
       postId,
     ]);
 
     let isLiked = false;
+    let likesCount = postResult.rows[0].likes_count || 0;
 
     if (likeCheck.rows.length > 0) {
-      // Unlike post: remove row
-      await db.query('DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2', [userId, postId]);
-      // Decrement likes count
-      await db.query('UPDATE posts SET likes_count = GREATEST(0, likes_count - 1) WHERE id = $1', [postId]);
+      // Unlike post: remove row idempotently
+      const delRes = await db.query(
+        'DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2 RETURNING id',
+        [userId, postId]
+      );
+      const countRes = await db.query(
+        'SELECT COUNT(*)::int AS cnt FROM post_likes WHERE post_id = $1',
+        [postId]
+      );
+      const actualCount = countRes.rows[0]?.cnt || 0;
+      const targetSql = delRes.rowCount > 0
+        ? 'UPDATE posts SET likes_count = GREATEST($1::int, GREATEST(0, COALESCE(likes_count, 0) - 1)) WHERE id = $2 RETURNING COALESCE(likes_count, 0)::int AS likes_count'
+        : 'UPDATE posts SET likes_count = GREATEST($1::int, COALESCE(likes_count, 0)) WHERE id = $2 RETURNING COALESCE(likes_count, 0)::int AS likes_count';
+      const updatedPost = await db.query(targetSql, [actualCount, postId]);
+      likesCount = updatedPost.rows[0]?.likes_count ?? actualCount;
       isLiked = false;
     } else {
-      // Like post: insert row
-      await db.query('INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2)', [userId, postId]);
-      // Increment likes count
-      await db.query('UPDATE posts SET likes_count = likes_count + 1 WHERE id = $1', [postId]);
+      // Like post: insert row idempotently
+      const insRes = await db.query(
+        'INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2) ON CONFLICT (user_id, post_id) DO NOTHING RETURNING id',
+        [userId, postId]
+      );
+      const countRes = await db.query(
+        'SELECT COUNT(*)::int AS cnt FROM post_likes WHERE post_id = $1',
+        [postId]
+      );
+      const actualCount = countRes.rows[0]?.cnt || 0;
+      const targetSql = insRes.rowCount > 0
+        ? 'UPDATE posts SET likes_count = GREATEST($1::int, COALESCE(likes_count, 0) + 1) WHERE id = $2 RETURNING COALESCE(likes_count, 0)::int AS likes_count'
+        : 'UPDATE posts SET likes_count = GREATEST($1::int, COALESCE(likes_count, 0)) WHERE id = $2 RETURNING COALESCE(likes_count, 0)::int AS likes_count';
+      const updatedPost = await db.query(targetSql, [actualCount, postId]);
+      likesCount = updatedPost.rows[0]?.likes_count ?? actualCount;
       isLiked = true;
 
-      // Send notification if liked by someone else
-      const postCreator = postResult.rows[0].user_id;
-      if (postCreator !== userId) {
-        const actorInfo = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
-        const actorName = actorInfo.rows[0].name || actorInfo.rows[0].username;
-        await db.query(
-          `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            postCreator,
-            userId,
-            'like',
-            postId,
-            `${actorName} liked your AR capture.`
-          ]
-        );
+      // Send notification if newly liked by someone else (never fail like on notification issue)
+      if (insRes.rowCount > 0 && postCreator !== userId) {
+        try {
+          const actorInfo = await db.query('SELECT name, username FROM users WHERE id = $1', [userId]);
+          const actorName = actorInfo.rows[0]?.name || actorInfo.rows[0]?.username || 'Someone';
+          await db.query(
+            `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [
+              postCreator,
+              userId,
+              'like',
+              postId,
+              `${actorName} liked your AR capture.`
+            ]
+          );
+        } catch (notifErr) {
+          console.error('Error sending like notification:', notifErr.message);
+        }
       }
     }
-
-    // Fetch updated likes count
-    const updatedPost = await db.query('SELECT likes_count FROM posts WHERE id = $1', [postId]);
 
     return res.status(200).json({
       message: isLiked ? 'Post liked.' : 'Post unliked.',
       is_liked: isLiked,
-      likes_count: updatedPost.rows[0].likes_count,
+      likes_count: likesCount,
     });
   } catch (error) {
     console.error('Error toggling like:', error);
@@ -603,17 +634,21 @@ exports.toggleLike = async (req, res) => {
  * POST /api/posts/:id/bookmark
  */
 exports.toggleBookmark = async (req, res) => {
-  const userId = req.user.id;
-  const postId = parseInt(req.params.id);
+  const userId = parseInt(req.user.id, 10);
+  const postId = parseInt(req.params.id, 10);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: 'Invalid post ID.' });
+  }
 
   try {
     // Check if post exists
-    const postResult = await db.query('SELECT * FROM posts WHERE id = $1', [postId]);
+    const postResult = await db.query('SELECT id, user_id FROM posts WHERE id = $1', [postId]);
     if (postResult.rows.length === 0) {
       return res.status(404).json({ error: 'Post not found.' });
     }
 
-    const postCreator = postResult.rows[0].user_id;
+    const postCreator = parseInt(postResult.rows[0].user_id, 10);
     if (postCreator !== userId) {
       const blockStatus = await getBlockStatus(userId, postCreator);
       if (blockStatus.blocked) {
@@ -623,7 +658,7 @@ exports.toggleBookmark = async (req, res) => {
 
     // Check if user already bookmarked
     const bookmarkCheck = await db.query(
-      'SELECT * FROM post_bookmarks WHERE user_id = $1 AND post_id = $2',
+      'SELECT id FROM post_bookmarks WHERE user_id = $1 AND post_id = $2',
       [userId, postId]
     );
 
@@ -637,11 +672,11 @@ exports.toggleBookmark = async (req, res) => {
       ]);
       isBookmarked = false;
     } else {
-      // Bookmark
-      await db.query('INSERT INTO post_bookmarks (user_id, post_id) VALUES ($1, $2)', [
-        userId,
-        postId,
-      ]);
+      // Bookmark (conflict-safe)
+      await db.query(
+        'INSERT INTO post_bookmarks (user_id, post_id) VALUES ($1, $2) ON CONFLICT (user_id, post_id) DO NOTHING',
+        [userId, postId]
+      );
       isBookmarked = true;
     }
 
@@ -663,7 +698,9 @@ exports.getSavedPosts = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    await ensureUserBlocksTable();
     await ensurePostLocationColumns();
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
     const savedResult = await db.query(
       `SELECT 
         p.id, 
@@ -680,7 +717,10 @@ exports.getSavedPosts = async (req, res) => {
         p.city,
         p.state,
         p.country,
-        p.likes_count, 
+        GREATEST(
+          COALESCE(p.likes_count, 0),
+          (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+        )::int AS likes_count, 
         p.created_at,
         u.id AS author_id,
         u.name AS author_name,
@@ -698,7 +738,7 @@ exports.getSavedPosts = async (req, res) => {
       FROM posts p
       INNER JOIN post_bookmarks pb ON p.id = pb.post_id
       INNER JOIN users u ON p.user_id = u.id
-      WHERE pb.user_id = $1
+      WHERE pb.user_id = $1 AND ${blockFilter}
       ORDER BY pb.created_at DESC`,
       [userId]
     );
@@ -724,6 +764,7 @@ exports.getUserPosts = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    await ensureUserBlocksTable();
     await ensureTagMentionSchema();
     await ensurePostLocationColumns();
     if (currentUserId && parseInt(currentUserId, 10) !== userId) {
@@ -749,7 +790,10 @@ exports.getUserPosts = async (req, res) => {
         p.city,
         p.state,
         p.country,
-        p.likes_count, 
+        GREATEST(
+          COALESCE(p.likes_count, 0),
+          (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+        )::int AS likes_count, 
         p.created_at,
         COALESCE(
           (SELECT TRUE FROM post_likes WHERE post_id = p.id AND user_id = $2 LIMIT 1), 
@@ -784,8 +828,12 @@ exports.getUserPosts = async (req, res) => {
  * GET /api/posts/:id/comments
  */
 exports.getComments = async (req, res) => {
-  const postId = parseInt(req.params.id);
+  const postId = parseInt(req.params.id, 10);
   const currentUserId = req.user ? req.user.id : null;
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: 'Invalid post ID.' });
+  }
 
   try {
     await ensureUserBlocksTable();
@@ -831,9 +879,13 @@ exports.getComments = async (req, res) => {
  * POST /api/posts/:id/comment
  */
 exports.addComment = async (req, res) => {
-  const userId = req.user.id;
-  const postId = parseInt(req.params.id);
+  const userId = parseInt(req.user.id, 10);
+  const postId = parseInt(req.params.id, 10);
   const { text } = req.body;
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: 'Invalid post ID.' });
+  }
 
   if (!text || text.trim() === '') {
     return res.status(400).json({ error: 'Comment text is required.' });
@@ -847,7 +899,7 @@ exports.addComment = async (req, res) => {
       return res.status(404).json({ error: 'Post not found.' });
     }
 
-    const postCreator = postResult.rows[0].user_id;
+    const postCreator = parseInt(postResult.rows[0].user_id, 10);
     if (postCreator !== userId) {
       const blockStatus = await getBlockStatus(userId, postCreator);
       if (blockStatus.blocked) {
@@ -893,18 +945,22 @@ exports.addComment = async (req, res) => {
 
     // Send comment notification to post author if commented by someone else
     if (postCreator !== userId) {
-      await db.query(
-        `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          postCreator,
-          userId,
-          'comment',
-          postId,
-          result.rows[0].id,
-          `${actorName} commented: "${snippet}"`
-        ]
-      );
+      try {
+        await db.query(
+          `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            postCreator,
+            userId,
+            'comment',
+            postId,
+            result.rows[0].id,
+            `${actorName} commented: "${snippet}"`
+          ]
+        );
+      } catch (commentNotifErr) {
+        console.error('Error sending comment notification:', commentNotifErr.message);
+      }
     }
 
     // Send mention notifications to mentioned users (excluding self & postCreator who received comment notification)
@@ -1064,13 +1120,14 @@ exports.deleteComment = async (req, res) => {
  * GET /api/posts/:id
  */
 exports.getPostById = async (req, res) => {
-  const postId = parseInt(req.params.id);
-  if (isNaN(postId)) {
+  const postId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(postId) || postId <= 0) {
     return res.status(404).json({ error: 'Post not found.' });
   }
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    await ensureUserBlocksTable();
     await ensureTagMentionSchema();
     await ensurePostLocationColumns();
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
@@ -1091,12 +1148,27 @@ exports.getPostById = async (req, res) => {
         p.city,
         p.state,
         p.country,
-        p.likes_count, 
+        GREATEST(
+          COALESCE(p.likes_count, 0),
+          (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+        )::int AS likes_count, 
         p.created_at,
         u.id AS author_id,
         u.name AS author_name,
         u.username AS author_username,
         u.profile_picture AS author_profile_picture,
+        (
+          COALESCE(u.is_verified, FALSE)
+          OR LOWER(u.username) IN ('hidely_official', 'hidely')
+          OR (SELECT COUNT(*)::int FROM posts p_cnt WHERE p_cnt.user_id = u.id) >= 50
+          OR (SELECT COUNT(*)::int FROM user_follows f_cnt WHERE f_cnt.following_id = u.id) >= 50000
+        ) AS author_is_verified,
+        (
+          COALESCE(u.is_verified, FALSE)
+          OR LOWER(u.username) IN ('hidely_official', 'hidely')
+          OR (SELECT COUNT(*)::int FROM posts p_cnt WHERE p_cnt.user_id = u.id) >= 50
+          OR (SELECT COUNT(*)::int FROM user_follows f_cnt WHERE f_cnt.following_id = u.id) >= 50000
+        ) AS is_verified,
         COALESCE(
           (SELECT TRUE FROM post_likes WHERE post_id = p.id AND user_id = $2 LIMIT 1), 
           FALSE
@@ -1117,6 +1189,12 @@ exports.getPostById = async (req, res) => {
     );
 
     if (postResult.rows.length === 0) {
+      if (currentUserId) {
+        const existsRes = await db.query('SELECT user_id FROM posts WHERE id = $1', [postId]);
+        if (existsRes.rows.length > 0) {
+          return res.status(403).json({ error: 'Cannot view this post.', blocked: true });
+        }
+      }
       return res.status(404).json({ error: 'Post not found.' });
     }
 
@@ -1159,6 +1237,7 @@ exports.getExplorePosts = async (req, res) => {
       parsedOffset = off;
     }
 
+    await ensureUserBlocksTable();
     await ensureTagMentionSchema();
     await ensurePostLocationColumns();
     const exploreBlockFilter = isNotMutuallyBlockedSql('u.id', '$1');
@@ -1180,7 +1259,10 @@ exports.getExplorePosts = async (req, res) => {
           p.city,
           p.state,
           p.country,
-          p.likes_count, 
+          GREATEST(
+            COALESCE(p.likes_count, 0),
+            (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.id)
+          )::int AS likes_count, 
           p.created_at,
           u.id AS author_id,
           u.name AS author_name,
