@@ -32,6 +32,33 @@ function approvedTaggedUsersSql(postIdExpr, currentUserParam) {
   ) AS tagged_users`;
 }
 
+let postLocationColumnsPromise = null;
+function ensurePostLocationColumns() {
+  if (!postLocationColumnsPromise) {
+    postLocationColumnsPromise = db.query(`
+      ALTER TABLE posts 
+      ADD COLUMN IF NOT EXISTS duplicate_cluster_id VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS location_accuracy_meters DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS location_source VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS location_captured_at TIMESTAMP WITH TIME ZONE,
+      ADD COLUMN IF NOT EXISTS canonical_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS landmark_type VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS state VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS ai_confidence DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS place_id INTEGER;
+    `).catch((err) => {
+      postLocationColumnsPromise = null;
+      console.error('Error ensuring post location columns:', err.message);
+    });
+  }
+  return postLocationColumnsPromise;
+}
+
 function cleanupTempFile(file) {
   if (file && file.path && fs.existsSync(file.path)) {
     try {
@@ -108,6 +135,8 @@ exports.createPost = async (req, res) => {
     // Upload the file to Cloudinary in the posts folder
     const imageUrl = await uploadToCloudinary(req.file.path, 'hidely/posts');
 
+    await ensurePostLocationColumns();
+
     // Coordinate & accuracy validation
     let validLat = null;
     let validLng = null;
@@ -117,21 +146,31 @@ exports.createPost = async (req, res) => {
 
     if (latitude !== undefined && latitude !== null && latitude !== '') {
       const parsedLat = parseFloat(latitude);
-      if (!isNaN(parsedLat) && parsedLat >= -90 && parsedLat <= 90) {
+      if (Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90) {
         validLat = parsedLat;
       }
     }
 
     if (longitude !== undefined && longitude !== null && longitude !== '') {
       const parsedLng = parseFloat(longitude);
-      if (!isNaN(parsedLng) && parsedLng >= -180 && parsedLng <= 180) {
+      if (Number.isFinite(parsedLng) && parsedLng >= -180 && parsedLng <= 180) {
         validLng = parsedLng;
       }
     }
 
+    // Reject (0.0, 0.0) / uninitialized "null island" or single incomplete axis
+    if (
+      validLat === null ||
+      validLng === null ||
+      (Math.abs(validLat) < 0.0001 && Math.abs(validLng) < 0.0001)
+    ) {
+      validLat = null;
+      validLng = null;
+    }
+
     if (location_accuracy_meters !== undefined && location_accuracy_meters !== null && location_accuracy_meters !== '') {
       const parsedAcc = parseFloat(location_accuracy_meters);
-      if (!isNaN(parsedAcc) && parsedAcc >= 0) {
+      if (Number.isFinite(parsedAcc) && parsedAcc >= 0) {
         validAccuracy = parsedAcc;
       }
     }
@@ -145,37 +184,75 @@ exports.createPost = async (req, res) => {
     }
 
     // Place Identity calculations
-    const cName = canonical_name || location || '';
-    const normName = normalized_name || cName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const parsedAiConfidence = ai_confidence ? parseFloat(ai_confidence) : 0.95;
-    const clusterId = duplicate_cluster_id || (validLat && validLng ? `cluster_${validLat.toFixed(3)}_${validLng.toFixed(3)}` : null);
+    const rawLocation = (location || '').toString().trim();
+    const safeLocation = rawLocation.slice(0, 150);
+    const cName = (canonical_name || rawLocation || '').toString().trim().slice(0, 255);
+    const placeName = cName.slice(0, 150);
+    const normName = (normalized_name || cName.toLowerCase().replace(/[^a-z0-9]/g, '')).toString().slice(0, 255);
+    const rawAiConf = parseFloat(ai_confidence);
+    const parsedAiConfidence = Number.isFinite(rawAiConf) ? rawAiConf : 0.95;
+    const safeLandmarkType = (landmark_type || '').toString().trim().slice(0, 100);
+    const hasValidCoords = validLat !== null && validLng !== null;
+    const clusterId = duplicate_cluster_id
+      ? duplicate_cluster_id.toString().slice(0, 100)
+      : (hasValidCoords ? `cluster_${validLat.toFixed(3)}_${validLng.toFixed(3)}` : null);
 
-    // Auto-match or create Master Place in `places` table for grouping all posts under 1 Master Place
+    // Infer city/state if missing from multi-part "Place, City" / "City, State" display strings
+    let resolvedCity = (city || '').toString().trim();
+    let resolvedState = (state || '').toString().trim();
+    let resolvedCountry = (country || '').toString().trim();
+    if (!resolvedCity && rawLocation.includes(',')) {
+      const locParts = rawLocation.split(',').map((s) => s.trim()).filter(Boolean);
+      if (locParts.length >= 2) {
+        resolvedCity = locParts[1];
+      }
+    }
+    resolvedCity = resolvedCity.slice(0, 100);
+    resolvedState = resolvedState.slice(0, 100);
+    resolvedCountry = resolvedCountry.slice(0, 100);
+
+    // Auto-match or create Master Place in `places` table BEFORE inserting reward flags
     let masterPlaceId = null;
-    if (cName && cName.trim() !== '' && cName.trim() !== 'Unknown Location') {
+    let isNewMasterPlace = false;
+    let isDuplicatePlace = false;
+    if (placeName !== '' && placeName.toLowerCase() !== 'unknown location') {
       try {
         const placeSearch = await db.query(
-          'SELECT id FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1',
-          [cName.trim()]
+          'SELECT id, latitude, longitude FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1',
+          [placeName]
         );
         if (placeSearch.rows.length > 0) {
           masterPlaceId = placeSearch.rows[0].id;
-        } else {
+          isDuplicatePlace = true;
+          const existingLat = parseFloat(placeSearch.rows[0].latitude);
+          const existingLng = parseFloat(placeSearch.rows[0].longitude);
+          if (
+            hasValidCoords &&
+            Math.abs(existingLat) < 0.0001 &&
+            Math.abs(existingLng) < 0.0001
+          ) {
+            await db.query(
+              'UPDATE places SET latitude = $1, longitude = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              [validLat, validLng, masterPlaceId]
+            );
+          }
+        } else if (hasValidCoords) {
           const newPlace = await db.query(
             `INSERT INTO places (name, description, category, latitude, longitude, rating, image_url, is_featured)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
             [
-              cName.trim(),
-              `Hidden travel location: ${cName.trim()}`,
-              category || 'Nature',
-              validLat || 0.0,
-              validLng || 0.0,
+              placeName,
+              `Hidden travel location: ${cName}`,
+              (category || 'Nature').toString().slice(0, 100),
+              validLat,
+              validLng,
               4.8,
               imageUrl,
               true
             ]
           );
           masterPlaceId = newPlace.rows[0].id;
+          isNewMasterPlace = true;
         }
       } catch (err) {
         console.error('Error auto-linking master place:', err.message || err);
@@ -193,8 +270,8 @@ exports.createPost = async (req, res) => {
           userId, 
           caption || '', 
           imageUrl, 
-          location || '', 
-          category || '',
+          safeLocation, 
+          (category || '').toString().slice(0, 100),
           validLat,
           validLng,
           validAccuracy,
@@ -202,10 +279,10 @@ exports.createPost = async (req, res) => {
           validCapturedAt,
           cName,
           normName,
-          landmark_type || '',
-          city || '',
-          state || '',
-          country || '',
+          safeLandmarkType,
+          resolvedCity,
+          resolvedState,
+          resolvedCountry,
           parsedAiConfidence,
           clusterId,
           masterPlaceId
@@ -214,23 +291,8 @@ exports.createPost = async (req, res) => {
     } catch (insertErr) {
       console.error('Extended post insert failed, attempting auto-migration and retry:', insertErr.message);
       try {
-        await db.query(`
-          ALTER TABLE posts 
-          ADD COLUMN IF NOT EXISTS duplicate_cluster_id VARCHAR(100),
-          ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
-          ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
-          ADD COLUMN IF NOT EXISTS location_accuracy_meters DOUBLE PRECISION,
-          ADD COLUMN IF NOT EXISTS location_source VARCHAR(50),
-          ADD COLUMN IF NOT EXISTS location_captured_at TIMESTAMP WITH TIME ZONE,
-          ADD COLUMN IF NOT EXISTS canonical_name VARCHAR(255),
-          ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(255),
-          ADD COLUMN IF NOT EXISTS landmark_type VARCHAR(100),
-          ADD COLUMN IF NOT EXISTS city VARCHAR(100),
-          ADD COLUMN IF NOT EXISTS state VARCHAR(100),
-          ADD COLUMN IF NOT EXISTS country VARCHAR(100),
-          ADD COLUMN IF NOT EXISTS ai_confidence DOUBLE PRECISION,
-          ADD COLUMN IF NOT EXISTS place_id INTEGER;
-        `);
+        postLocationColumnsPromise = null;
+        await ensurePostLocationColumns();
 
         newPostResult = await db.query(
           `INSERT INTO posts 
@@ -241,8 +303,8 @@ exports.createPost = async (req, res) => {
             userId, 
             caption || '', 
             imageUrl, 
-            location || '', 
-            category || '',
+            safeLocation, 
+            (category || '').toString().slice(0, 100),
             validLat,
             validLng,
             validAccuracy,
@@ -250,10 +312,10 @@ exports.createPost = async (req, res) => {
             validCapturedAt,
             cName,
             normName,
-            landmark_type || '',
-            city || '',
-            state || '',
-            country || '',
+            safeLandmarkType,
+            resolvedCity,
+            resolvedState,
+            resolvedCountry,
             parsedAiConfidence,
             clusterId,
             masterPlaceId
@@ -265,26 +327,12 @@ exports.createPost = async (req, res) => {
           `INSERT INTO posts (user_id, caption, image_url, location, category) 
            VALUES ($1, $2, $3, $4, $5) 
            RETURNING *`,
-          [userId, caption || '', imageUrl, location || '', category || '']
+          [userId, caption || '', imageUrl, safeLocation, (category || '').toString().slice(0, 100)]
         );
       }
     }
 
     const post = newPostResult.rows[0];
-
-    // Process Server-Side Rewards with Anti-Spam & Duplicate Place safeguards
-    let isNewMasterPlace = false;
-    let isDuplicatePlace = false;
-    if (cName && cName.trim() !== '' && cName.trim() !== 'Unknown Location') {
-      try {
-        const placeSearch = await db.query('SELECT id FROM places WHERE LOWER(name) = LOWER($1) LIMIT 1', [cName.trim()]);
-        if (placeSearch.rows.length > 0) {
-          isDuplicatePlace = true;
-        } else {
-          isNewMasterPlace = true;
-        }
-      } catch (_) {}
-    }
 
     try {
       const rewardService = require('../services/rewardService');
@@ -417,6 +465,7 @@ exports.getFeed = async (req, res) => {
 
   try {
     await ensureTagMentionSchema();
+    await ensurePostLocationColumns();
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
 
     const feedResult = await db.query(
@@ -426,6 +475,15 @@ exports.getFeed = async (req, res) => {
         p.image_url, 
         p.location, 
         p.category, 
+        p.latitude,
+        p.longitude,
+        p.location_source,
+        p.location_accuracy_meters,
+        p.canonical_name,
+        p.landmark_type,
+        p.city,
+        p.state,
+        p.country,
         p.likes_count, 
         p.created_at,
         u.id AS author_id,
@@ -605,6 +663,7 @@ exports.getSavedPosts = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    await ensurePostLocationColumns();
     const savedResult = await db.query(
       `SELECT 
         p.id, 
@@ -612,6 +671,15 @@ exports.getSavedPosts = async (req, res) => {
         p.image_url, 
         p.location, 
         p.category, 
+        p.latitude,
+        p.longitude,
+        p.location_source,
+        p.location_accuracy_meters,
+        p.canonical_name,
+        p.landmark_type,
+        p.city,
+        p.state,
+        p.country,
         p.likes_count, 
         p.created_at,
         u.id AS author_id,
@@ -657,6 +725,7 @@ exports.getUserPosts = async (req, res) => {
 
   try {
     await ensureTagMentionSchema();
+    await ensurePostLocationColumns();
     if (currentUserId && parseInt(currentUserId, 10) !== userId) {
       const blockStatus = await getBlockStatus(currentUserId, userId);
       if (blockStatus.blocked) {
@@ -671,6 +740,15 @@ exports.getUserPosts = async (req, res) => {
         p.image_url, 
         p.location, 
         p.category, 
+        p.latitude,
+        p.longitude,
+        p.location_source,
+        p.location_accuracy_meters,
+        p.canonical_name,
+        p.landmark_type,
+        p.city,
+        p.state,
+        p.country,
         p.likes_count, 
         p.created_at,
         COALESCE(
@@ -994,6 +1072,7 @@ exports.getPostById = async (req, res) => {
 
   try {
     await ensureTagMentionSchema();
+    await ensurePostLocationColumns();
     const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
 
     const postResult = await db.query(
@@ -1003,6 +1082,15 @@ exports.getPostById = async (req, res) => {
         p.image_url, 
         p.location, 
         p.category, 
+        p.latitude,
+        p.longitude,
+        p.location_source,
+        p.location_accuracy_meters,
+        p.canonical_name,
+        p.landmark_type,
+        p.city,
+        p.state,
+        p.country,
         p.likes_count, 
         p.created_at,
         u.id AS author_id,
@@ -1072,6 +1160,7 @@ exports.getExplorePosts = async (req, res) => {
     }
 
     await ensureTagMentionSchema();
+    await ensurePostLocationColumns();
     const exploreBlockFilter = isNotMutuallyBlockedSql('u.id', '$1');
 
     let query = `
@@ -1082,6 +1171,15 @@ exports.getExplorePosts = async (req, res) => {
           p.image_url, 
           p.location, 
           p.category, 
+          p.latitude,
+          p.longitude,
+          p.location_source,
+          p.location_accuracy_meters,
+          p.canonical_name,
+          p.landmark_type,
+          p.city,
+          p.state,
+          p.country,
           p.likes_count, 
           p.created_at,
           u.id AS author_id,
@@ -1130,13 +1228,13 @@ exports.getExplorePosts = async (req, res) => {
     }
 
     if (city && city !== 'All') {
-      query += ` AND p.location ILIKE $${paramIndex}`;
+      query += ` AND (p.location ILIKE $${paramIndex} OR p.city ILIKE $${paramIndex} OR p.state ILIKE $${paramIndex})`;
       queryParams.push(`%${city}%`);
       paramIndex++;
     }
 
     if (search && search.trim() !== '') {
-      query += ` AND (p.caption ILIKE $${paramIndex} OR p.location ILIKE $${paramIndex} OR p.category ILIKE $${paramIndex})`;
+      query += ` AND (p.caption ILIKE $${paramIndex} OR p.location ILIKE $${paramIndex} OR p.canonical_name ILIKE $${paramIndex} OR p.city ILIKE $${paramIndex} OR p.state ILIKE $${paramIndex} OR p.category ILIKE $${paramIndex})`;
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -1168,6 +1266,15 @@ exports.getExplorePosts = async (req, res) => {
         tp.image_url,
         tp.location,
         tp.category,
+        tp.latitude,
+        tp.longitude,
+        tp.location_source,
+        tp.location_accuracy_meters,
+        tp.canonical_name,
+        tp.landmark_type,
+        tp.city,
+        tp.state,
+        tp.country,
         tp.likes_count,
         tp.created_at,
         tp.author_id,
