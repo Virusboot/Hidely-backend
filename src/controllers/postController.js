@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { ensureUserBlocksTable, getBlockStatus, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
 
 /**
  * Create a new travel post
@@ -235,7 +236,8 @@ exports.createPost = async (req, res) => {
         `INSERT INTO notifications (user_id, actor_id, type, post_id, text)
          SELECT follower_id, $1, 'new_post', $2, $3
          FROM user_follows
-         WHERE following_id = $1 AND follower_id != $1`,
+         WHERE following_id = $1 AND follower_id != $1
+           AND ${isNotMutuallyBlockedSql('follower_id', '$1')}`,
         [
           userId,
           post.id,
@@ -270,6 +272,9 @@ exports.getFeed = async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
 
   try {
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
+
     const feedResult = await db.query(
       `SELECT 
         p.id, 
@@ -298,6 +303,7 @@ exports.getFeed = async (req, res) => {
         (SELECT COUNT(*)::int FROM post_comments WHERE post_id = p.id) AS comments_count
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
+      WHERE ${blockFilter}
       ORDER BY p.created_at DESC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
@@ -325,6 +331,14 @@ exports.toggleLike = async (req, res) => {
     const postResult = await db.query('SELECT * FROM posts WHERE id = $1', [postId]);
     if (postResult.rows.length === 0) {
       return res.status(404).json({ error: 'Post not found.' });
+    }
+
+    const postCreator = postResult.rows[0].user_id;
+    if (postCreator !== userId) {
+      const blockStatus = await getBlockStatus(userId, postCreator);
+      if (blockStatus.blocked) {
+        return res.status(403).json({ error: 'Cannot interact with this post.', blocked: true });
+      }
     }
 
     // Check if user already liked the post
@@ -394,6 +408,14 @@ exports.toggleBookmark = async (req, res) => {
     const postResult = await db.query('SELECT * FROM posts WHERE id = $1', [postId]);
     if (postResult.rows.length === 0) {
       return res.status(404).json({ error: 'Post not found.' });
+    }
+
+    const postCreator = postResult.rows[0].user_id;
+    if (postCreator !== userId) {
+      const blockStatus = await getBlockStatus(userId, postCreator);
+      if (blockStatus.blocked) {
+        return res.status(403).json({ error: 'Cannot interact with this post.', blocked: true });
+      }
     }
 
     // Check if user already bookmarked
@@ -489,6 +511,13 @@ exports.getUserPosts = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    if (currentUserId && parseInt(currentUserId, 10) !== userId) {
+      const blockStatus = await getBlockStatus(currentUserId, userId);
+      if (blockStatus.blocked) {
+        return res.status(200).json({ posts: [], blocked: true });
+      }
+    }
+
     const postsResult = await db.query(
       `SELECT 
         p.id, 
@@ -534,6 +563,10 @@ exports.getComments = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    await ensureUserBlocksTable();
+    const commenterBlockFilter = isNotMutuallyBlockedSql('u.id', '$2');
+    const postAuthorBlockFilter = isNotMutuallyBlockedSql('p.user_id', '$2');
+
     const result = await db.query(
       `SELECT 
         c.id,
@@ -552,8 +585,11 @@ exports.getComments = async (req, res) => {
           0
         ) AS likes_count
       FROM post_comments c
+      INNER JOIN posts p ON c.post_id = p.id
       INNER JOIN users u ON c.user_id = u.id
       WHERE c.post_id = $1
+        AND ${commenterBlockFilter}
+        AND ${postAuthorBlockFilter}
       ORDER BY c.created_at ASC`,
       [postId, currentUserId]
     );
@@ -579,6 +615,19 @@ exports.addComment = async (req, res) => {
   }
 
   try {
+    const postResult = await db.query('SELECT user_id FROM posts WHERE id = $1', [postId]);
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found.' });
+    }
+
+    const postCreator = postResult.rows[0].user_id;
+    if (postCreator !== userId) {
+      const blockStatus = await getBlockStatus(userId, postCreator);
+      if (blockStatus.blocked) {
+        return res.status(403).json({ error: 'Cannot comment on this post.', blocked: true });
+      }
+    }
+
     const result = await db.query(
       `INSERT INTO post_comments (post_id, user_id, text)
        VALUES ($1, $2, $3)
@@ -599,24 +648,20 @@ exports.addComment = async (req, res) => {
     };
 
     // Send comment notification to post author if commented by someone else
-    const postResult = await db.query('SELECT user_id FROM posts WHERE id = $1', [postId]);
-    if (postResult.rows.length > 0) {
-      const postCreator = postResult.rows[0].user_id;
-      if (postCreator !== userId) {
-        const actorName = userResult.rows[0].name || userResult.rows[0].username;
-        await db.query(
-          `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            postCreator,
-            userId,
-            'comment',
-            postId,
-            result.rows[0].id,
-            `${actorName} commented: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"`
-          ]
-        );
-      }
+    if (postCreator !== userId) {
+      const actorName = userResult.rows[0].name || userResult.rows[0].username;
+      await db.query(
+        `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          postCreator,
+          userId,
+          'comment',
+          postId,
+          result.rows[0].id,
+          `${actorName} commented: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"`
+        ]
+      );
     }
 
     return res.status(201).json({
@@ -762,6 +807,9 @@ exports.getPostById = async (req, res) => {
   const currentUserId = req.user ? req.user.id : null;
 
   try {
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
+
     const postResult = await db.query(
       `SELECT 
         p.id, 
@@ -789,7 +837,7 @@ exports.getPostById = async (req, res) => {
         ) AS comments_count
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
-      WHERE p.id = $1`,
+      WHERE p.id = $1 AND ${blockFilter}`,
       [postId, currentUserId]
     );
 
@@ -836,6 +884,9 @@ exports.getExplorePosts = async (req, res) => {
       parsedOffset = off;
     }
 
+    await ensureUserBlocksTable();
+    const exploreBlockFilter = isNotMutuallyBlockedSql('u.id', '$1');
+
     let query = `
       WITH target_posts AS (
         SELECT 
@@ -852,7 +903,7 @@ exports.getExplorePosts = async (req, res) => {
           u.profile_picture AS author_profile_picture
         FROM posts p
         INNER JOIN users u ON p.user_id = u.id
-        WHERE 1=1
+        WHERE ${exploreBlockFilter}
     `;
 
     const queryParams = [currentUserId];

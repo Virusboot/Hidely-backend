@@ -67,7 +67,7 @@ exports.register = async (req, res) => {
     const user = newUser.rows[0];
 
     // Generate JWT token immediately on registration
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '90d' });
 
     return res.status(201).json({
       message: 'Registration successful!',
@@ -133,7 +133,7 @@ exports.verifyOTP = async (req, res) => {
     const user = userResult.rows[0];
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '90d' });
 
     // Clean up used OTPs
     await db.query('DELETE FROM otps WHERE email = $1', [emailLower]);
@@ -211,7 +211,7 @@ exports.login = async (req, res) => {
     }
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '90d' });
 
     return res.status(200).json({
       message: 'Logged in successfully.',

@@ -1,11 +1,14 @@
 const db = require('../config/db');
 const rewardService = require('../services/rewardService');
+const { ensureUserBlocksTable, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
 
 /**
  * GET /api/gamification/leaderboard?period=weekly|monthly|all_time&limit=100&offset=0
  */
 exports.getLeaderboard = async (req, res) => {
   try {
+    await ensureUserBlocksTable();
+    const currentUserId = req.user && req.user.id ? req.user.id : null;
     const period = (req.query.period || 'all_time').toLowerCase();
     let timeClause = '';
 
@@ -35,6 +38,7 @@ exports.getLeaderboard = async (req, res) => {
       parsedOffset = off;
     }
 
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$3');
     let query = '';
     if (period === 'all_time') {
       query = `
@@ -54,7 +58,7 @@ exports.getLeaderboard = async (req, res) => {
           b.category as featured_badge_category
         FROM users u
         LEFT JOIN badges b ON b.id = u.featured_badge_id
-        WHERE u.username IS NOT NULL AND u.username != ''
+        WHERE u.username IS NOT NULL AND u.username != '' AND ${blockFilter}
         ORDER BY u.total_points DESC, u.explorer_score DESC, u.id ASC
         LIMIT $1 OFFSET $2
       `;
@@ -81,14 +85,14 @@ exports.getLeaderboard = async (req, res) => {
         FROM users u
         LEFT JOIN point_transactions pt ON pt.user_id = u.id ${intervalCondition}
         LEFT JOIN badges b ON b.id = u.featured_badge_id
-        WHERE u.username IS NOT NULL AND u.username != ''
+        WHERE u.username IS NOT NULL AND u.username != '' AND ${blockFilter}
         GROUP BY u.id, b.id
         ORDER BY points DESC, u.total_points DESC, u.explorer_score DESC, u.id ASC
         LIMIT $1 OFFSET $2
       `;
     }
 
-    const result = await db.query(query, [parsedLimit, parsedOffset]);
+    const result = await db.query(query, [parsedLimit, parsedOffset, currentUserId]);
     const rows = result.rows;
 
     // Attach level metadata & calculate rank numbers

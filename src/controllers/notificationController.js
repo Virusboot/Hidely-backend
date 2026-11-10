@@ -1,6 +1,59 @@
 const db = require('../config/db');
+const { ensureUserBlocksTable, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
 
 
+
+/**
+ * Helper to create a notification row safely (used by rewardService and controllers)
+ */
+exports.createNotification = async ({
+  userId,
+  actorId = null,
+  type = 'system_announcement',
+  postId = null,
+  commentId = null,
+  title = '',
+  message = '',
+  text = '',
+}) => {
+  if (!userId) return null;
+
+  let resolvedActorId = actorId;
+  if (!resolvedActorId) {
+    try {
+      const officialRes = await db.query(
+        `SELECT id FROM users
+         WHERE username IN ('hidely_official', 'hidely', 'admin') OR is_admin = TRUE
+         ORDER BY id ASC LIMIT 1`
+      );
+      resolvedActorId = officialRes.rows[0]?.id || userId;
+    } catch (_) {
+      resolvedActorId = userId;
+    }
+  }
+
+  const rawTitle = (title || '').toString().trim();
+  const rawMessage = (message || '').toString().trim();
+  const rawText = (text || '').toString().trim();
+
+  let finalText = rawText;
+  if (!finalText) {
+    if (rawTitle && rawMessage) {
+      finalText = `${rawTitle} — ${rawMessage}`;
+    } else {
+      finalText = rawMessage || rawTitle || 'You have a new notification.';
+    }
+  }
+
+  const insertRes = await db.query(
+    `INSERT INTO notifications (user_id, actor_id, type, post_id, comment_id, text)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [userId, resolvedActorId, type, postId, commentId, finalText]
+  );
+
+  return insertRes.rows[0] || null;
+};
 
 /**
  * Fetch notifications for the current user (paginated)
@@ -13,6 +66,9 @@ exports.getNotifications = async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('n.actor_id', '$1');
+
     const result = await db.query(
       `SELECT 
         n.id,
@@ -22,23 +78,25 @@ exports.getNotifications = async (req, res) => {
         n.text,
         n.is_read,
         n.created_at,
-        u.id AS actor_id,
-        u.name AS actor_name,
-        u.username AS actor_username,
-        u.profile_picture AS actor_profile_picture,
+        COALESCE(u.id, n.actor_id) AS actor_id,
+        COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(u.username), ''), 'Hidely') AS actor_name,
+        COALESCE(NULLIF(TRIM(u.username), ''), 'hidely') AS actor_username,
+        COALESCE(u.profile_picture, '') AS actor_profile_picture,
         COALESCE(u.is_verified, FALSE) AS actor_is_verified,
         p.image_url AS post_image_url
       FROM notifications n
-      INNER JOIN users u ON n.actor_id = u.id
+      LEFT JOIN users u ON n.actor_id = u.id
       LEFT JOIN posts p ON n.post_id = p.id
-      WHERE n.user_id = $1
-      ORDER BY n.created_at DESC
+      WHERE n.user_id = $1 AND ${blockFilter}
+      ORDER BY n.created_at DESC, n.id DESC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
     );
 
     const unreadResult = await db.query(
-      'SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
+      `SELECT COUNT(*)::int AS count
+       FROM notifications n
+       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter}`,
       [userId]
     );
 
@@ -63,13 +121,18 @@ exports.markSingleAsRead = async (req, res) => {
   const notificationId = req.params.id;
 
   try {
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('n.actor_id', '$1');
+
     await db.query(
       'UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
       [notificationId, userId]
     );
 
     const unreadResult = await db.query(
-      'SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
+      `SELECT COUNT(*)::int AS count
+       FROM notifications n
+       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter}`,
       [userId]
     );
 
@@ -114,8 +177,13 @@ exports.getUnreadCount = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('n.actor_id', '$1');
+
     const result = await db.query(
-      'SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
+      `SELECT COUNT(*)::int AS count
+       FROM notifications n
+       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter}`,
       [userId]
     );
 

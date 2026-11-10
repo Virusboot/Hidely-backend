@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { getIo, isUserOnline } = require('../socket');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { ensureUserBlocksTable, getBlockStatus } = require('../utils/blockHelper');
 
 /**
  * Get User Inbox Conversations
@@ -11,6 +12,7 @@ exports.getConversations = async (req, res) => {
   const { archived } = req.query;
 
   try {
+    await ensureUserBlocksTable();
     const isArchivedParam = archived === 'true';
 
     const result = await db.query(
@@ -27,7 +29,21 @@ exports.getConversations = async (req, res) => {
           cm.last_read_message_id
         FROM conversations c
         JOIN conversation_members cm ON c.id = cm.conversation_id
-        WHERE cm.user_id = $1 AND cm.is_archived = $2
+        WHERE cm.user_id = $1
+          AND cm.is_archived = $2
+          AND (
+            c.type != 'DIRECT'
+            OR NOT EXISTS (
+              SELECT 1
+              FROM conversation_members cm_other
+              JOIN user_blocks ub ON (
+                (ub.blocker_id = $1 AND ub.blocked_id = cm_other.user_id)
+                OR (ub.blocker_id = cm_other.user_id AND ub.blocked_id = $1)
+              )
+              WHERE cm_other.conversation_id = c.id
+                AND cm_other.user_id != $1
+            )
+          )
         ORDER BY cm.is_pinned DESC, c.updated_at DESC
       )
       SELECT 
@@ -112,6 +128,14 @@ exports.getOrCreateDirectConversation = async (req, res) => {
   const targetId = parseInt(targetUserId);
 
   try {
+    const blockStatus = await getBlockStatus(userId, targetId);
+    if (blockStatus.blocked) {
+      return res.status(403).json({
+        error: 'Messaging is unavailable for this user.',
+        blocked: true,
+      });
+    }
+
     // Check if a direct conversation pair already exists
     const existing = await db.query(
       `SELECT c.id
@@ -275,6 +299,7 @@ exports.sendMessage = async (req, res) => {
 
   let client;
   try {
+    await ensureUserBlocksTable();
     client = await db.pool.connect();
 
     // Verify membership
@@ -286,6 +311,25 @@ exports.sendMessage = async (req, res) => {
       client.release();
       client = null;
       return res.status(403).json({ error: 'Not authorized to post in this conversation.' });
+    }
+
+    // Prevent messaging inside blocked DIRECT conversations
+    const blockCheck = await client.query(
+      `SELECT 1
+       FROM conversations c
+       JOIN conversation_members cm_other ON cm_other.conversation_id = c.id AND cm_other.user_id != $2
+       JOIN user_blocks ub ON (
+         (ub.blocker_id = $2 AND ub.blocked_id = cm_other.user_id)
+         OR (ub.blocker_id = cm_other.user_id AND ub.blocked_id = $2)
+       )
+       WHERE c.id = $1 AND c.type = 'DIRECT'
+       LIMIT 1`,
+      [conversationId, userId]
+    );
+    if (blockCheck.rows.length > 0) {
+      client.release();
+      client = null;
+      return res.status(403).json({ error: 'Messaging is unavailable for this conversation.', blocked: true });
     }
 
     let mediaUrl = null;

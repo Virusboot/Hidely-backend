@@ -27,4 +27,9 @@ router.get('/following/:username', authMiddleware.optional, userController.getFo
 // Search users by username or name (public/optional auth)
 router.get('/search', authMiddleware.optional, userController.searchUsers);
 
+// Blocked users management (private)
+router.get('/blocked', authMiddleware, userController.getBlockedUsers);
+router.post('/block/:identifier', authMiddleware, userController.blockUser);
+router.delete('/block/:identifier', authMiddleware, userController.unblockUser);
+
 module.exports = router;

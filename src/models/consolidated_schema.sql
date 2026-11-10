@@ -93,6 +93,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 10. Create user_blocks table (mutual user blocking)
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (blocker_id, blocked_id),
+    CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks (blocker_id);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks (blocked_id);
+
 -- Seed a default user with ID = 1 so that default post seeds can be linked correctly
 INSERT INTO users (id, name, email, password_hash, username, points, is_verified)
 VALUES (1, 'Admin User', 'admin@hidely.com', '$2b$10$UnPK41UWhV/42uLshGepx.a3v0Jj.zOQW/vXz3W.H/fDqI4Vp.KzS', 'admin', 7120, true)

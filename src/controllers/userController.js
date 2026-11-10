@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { ensureUserBlocksTable, getBlockStatus, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
 
 /**
  * Get current user profile details
@@ -151,6 +152,7 @@ exports.getCreatorProfile = async (req, res) => {
   const { username } = req.params;
   const currentUserId = req.user ? req.user.id : null;
 
+  try {
     const cleanUsername = username ? username.trim().replace(/^@/, '') : '';
     const creatorResult = await db.query(
       `SELECT 
@@ -178,6 +180,19 @@ exports.getCreatorProfile = async (req, res) => {
     }
 
     const creatorRow = creatorResult.rows[0];
+
+    if (currentUserId && parseInt(currentUserId, 10) !== parseInt(creatorRow.id, 10)) {
+      const blockStatus = await getBlockStatus(currentUserId, creatorRow.id);
+      if (blockStatus.blocked) {
+        return res.status(403).json({
+          error: blockStatus.blockedByA ? 'You have blocked this user.' : 'This profile is unavailable.',
+          blocked: true,
+          blocked_by_me: blockStatus.blockedByA,
+          blocked_me: blockStatus.blockedByB,
+          posts: [],
+        });
+      }
+    }
 
     // Get posts of this creator
     const postsResult = await db.query(
@@ -263,6 +278,14 @@ exports.toggleFollow = async (req, res) => {
       return res.status(400).json({ error: 'You cannot follow yourself.' });
     }
 
+    const blockStatus = await getBlockStatus(followerId, followingId);
+    if (blockStatus.blocked) {
+      return res.status(403).json({
+        error: 'Cannot follow or interact with a blocked user.',
+        blocked: true,
+      });
+    }
+
     const followCheck = await db.query(
       'SELECT * FROM user_follows WHERE follower_id = $1 AND following_id = $2',
       [followerId, followingId]
@@ -338,6 +361,16 @@ exports.getFollowing = async (req, res) => {
 
     const currentUserId = req.user ? req.user.id : null;
 
+    if (currentUserId && parseInt(currentUserId, 10) !== parseInt(targetUserId, 10)) {
+      const targetBlock = await getBlockStatus(currentUserId, targetUserId);
+      if (targetBlock.blocked) {
+        return res.status(403).json({ error: 'This profile is unavailable.', blocked: true, following: [] });
+      }
+    }
+
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
+
     const result = await db.query(
       `SELECT 
         u.id,
@@ -353,7 +386,7 @@ exports.getFollowing = async (req, res) => {
         EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = u.id) as is_following
       FROM users u
       INNER JOIN user_follows f ON u.id = f.following_id
-      WHERE f.follower_id = $1
+      WHERE f.follower_id = $1 AND ${blockFilter}
       ORDER BY f.created_at DESC`,
       [targetUserId, currentUserId]
     );
@@ -394,6 +427,16 @@ exports.getFollowers = async (req, res) => {
 
     const currentUserId = req.user ? req.user.id : null;
 
+    if (currentUserId && parseInt(currentUserId, 10) !== parseInt(targetUserId, 10)) {
+      const targetBlock = await getBlockStatus(currentUserId, targetUserId);
+      if (targetBlock.blocked) {
+        return res.status(403).json({ error: 'This profile is unavailable.', blocked: true, followers: [] });
+      }
+    }
+
+    await ensureUserBlocksTable();
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
+
     const result = await db.query(
       `SELECT 
         u.id,
@@ -409,7 +452,7 @@ exports.getFollowers = async (req, res) => {
         EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = u.id) as is_following
       FROM users u
       INNER JOIN user_follows f ON u.id = f.follower_id
-      WHERE f.following_id = $1
+      WHERE f.following_id = $1 AND ${blockFilter}
       ORDER BY f.created_at DESC`,
       [targetUserId, currentUserId]
     );
@@ -429,6 +472,10 @@ exports.getFollowers = async (req, res) => {
  */
 exports.getLeaderboard = async (req, res) => {
   try {
+    await ensureUserBlocksTable();
+    const currentUserId = req.user ? req.user.id : null;
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$1');
+
     const result = await db.query(
       `SELECT 
         u.id,
@@ -444,8 +491,9 @@ exports.getLeaderboard = async (req, res) => {
           OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
         ) AS is_verified
       FROM users u
-      WHERE u.username IS NOT NULL AND u.username != ''
-      ORDER BY points DESC, u.id ASC`
+      WHERE u.username IS NOT NULL AND u.username != '' AND ${blockFilter}
+      ORDER BY points DESC, u.id ASC`,
+      [currentUserId]
     );
 
     return res.status(200).json({
@@ -468,6 +516,10 @@ exports.searchUsers = async (req, res) => {
       return res.status(200).json({ users: [] });
     }
 
+    await ensureUserBlocksTable();
+    const currentUserId = req.user ? req.user.id : null;
+    const blockFilter = isNotMutuallyBlockedSql('u.id', '$2');
+
     const searchTerm = `%${q.trim()}%`;
     const result = await db.query(
       `SELECT 
@@ -482,10 +534,10 @@ exports.searchUsers = async (req, res) => {
           OR (SELECT COUNT(*)::int FROM user_follows f_sub WHERE f_sub.following_id = u.id) >= 50000
         ) AS is_verified
       FROM users u
-      WHERE (u.username ILIKE $1 OR u.name ILIKE $1)
+      WHERE (u.username ILIKE $1 OR u.name ILIKE $1) AND ${blockFilter}
       ORDER BY u.id DESC
       LIMIT 20`,
-      [searchTerm]
+      [searchTerm, currentUserId]
     );
 
     return res.status(200).json({
@@ -494,5 +546,138 @@ exports.searchUsers = async (req, res) => {
   } catch (error) {
     console.error('Error searching users:', error);
     return res.status(500).json({ error: 'Server error searching users.' });
+  }
+};
+
+/**
+ * Get list of users blocked by the authenticated user
+ * GET /api/users/blocked
+ */
+exports.getBlockedUsers = async (req, res) => {
+  const blockerId = req.user.id;
+  try {
+    await ensureUserBlocksTable();
+    const result = await db.query(
+      `SELECT u.id, u.name, u.username, u.profile_picture, ub.created_at AS blocked_at
+       FROM user_blocks ub
+       INNER JOIN users u ON u.id = ub.blocked_id
+       WHERE ub.blocker_id = $1
+       ORDER BY ub.created_at DESC`,
+      [blockerId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      blocked_users: result.rows.map((r) => r.username).filter(Boolean),
+      users: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching blocked users:', error);
+    return res.status(500).json({ error: 'Server error fetching blocked users.' });
+  }
+};
+
+/**
+ * Block a user by username or ID
+ * POST /api/users/block/:identifier
+ */
+exports.blockUser = async (req, res) => {
+  const blockerId = req.user.id;
+  const rawIdentifier = req.params.identifier || '';
+  const cleanIdentifier = rawIdentifier.trim().replace(/^@/, '');
+
+  if (!cleanIdentifier) {
+    return res.status(400).json({ error: 'Target username or ID is required.' });
+  }
+
+  try {
+    await ensureUserBlocksTable();
+    const targetRes = await db.query(
+      `SELECT id, username, name
+       FROM users
+       WHERE LOWER(username) = LOWER($1) OR username = $1 OR id::text = $1
+       LIMIT 1`,
+      [cleanIdentifier]
+    );
+
+    if (targetRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Target user not found.' });
+    }
+
+    const target = targetRes.rows[0];
+    if (parseInt(target.id, 10) === parseInt(blockerId, 10)) {
+      return res.status(400).json({ error: 'You cannot block yourself.' });
+    }
+
+    await db.query(
+      `INSERT INTO user_blocks (blocker_id, blocked_id)
+       VALUES ($1, $2)
+       ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
+      [blockerId, target.id]
+    );
+
+    // Sever mutual follow relationships immediately
+    await db.query(
+      `DELETE FROM user_follows
+       WHERE (follower_id = $1 AND following_id = $2)
+          OR (follower_id = $2 AND following_id = $1)`,
+      [blockerId, target.id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'User blocked successfully.',
+      blocked_username: target.username,
+      blocked_user_id: target.id,
+    });
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    return res.status(500).json({ error: 'Server error blocking user.' });
+  }
+};
+
+/**
+ * Unblock a user by username or ID
+ * DELETE /api/users/block/:identifier
+ */
+exports.unblockUser = async (req, res) => {
+  const blockerId = req.user.id;
+  const rawIdentifier = req.params.identifier || '';
+  const cleanIdentifier = rawIdentifier.trim().replace(/^@/, '');
+
+  if (!cleanIdentifier) {
+    return res.status(400).json({ error: 'Target username or ID is required.' });
+  }
+
+  try {
+    await ensureUserBlocksTable();
+    const targetRes = await db.query(
+      `SELECT id, username
+       FROM users
+       WHERE LOWER(username) = LOWER($1) OR username = $1 OR id::text = $1
+       LIMIT 1`,
+      [cleanIdentifier]
+    );
+
+    if (targetRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Target user not found.' });
+    }
+
+    const target = targetRes.rows[0];
+    await db.query(
+      `DELETE FROM user_blocks
+       WHERE blocker_id = $1 AND blocked_id = $2`,
+      [blockerId, target.id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'User unblocked successfully.',
+      unblocked_username: target.username,
+      unblocked_user_id: target.id,
+    });
+  } catch (error) {
+    console.error('Error unblocking user:', error);
+    return res.status(500).json({ error: 'Server error unblocking user.' });
   }
 };
