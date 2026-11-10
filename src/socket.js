@@ -5,7 +5,7 @@ const { JWT_SECRET } = require('./config/jwt');
 const { getSocketCorsConfig } = require('./config/corsConfig');
 
 let io = null;
-const onlineUsers = new Map(); // userId -> socketId
+const onlineUsers = new Map(); // String(userId) -> Set<socketId>
 
 function initSocket(server) {
   io = socketIo(server, {
@@ -29,17 +29,26 @@ function initSocket(server) {
 
   io.on('connection', (socket) => {
     const userId = socket.userId;
+    const userKey = String(userId);
     console.log(`[Socket.IO] User connected: ${userId} (socket ${socket.id})`);
-    
-    onlineUsers.set(String(userId), socket.id);
-    onlineUsers.set(parseInt(userId), socket.id);
-    socket.join(`user_${userId}`);
-    io.emit('presence_update', { userId: String(userId), status: 'online' });
+
+    let userSockets = onlineUsers.get(userKey);
+    const wasOffline = !userSockets || userSockets.size === 0;
+    if (!userSockets) {
+      userSockets = new Set();
+      onlineUsers.set(userKey, userSockets);
+    }
+    userSockets.add(socket.id);
+
+    socket.join(`user_${userKey}`);
+    if (wasOffline) {
+      io.emit('presence_update', { userId: userKey, status: 'online' });
+    }
 
     // Join conversation room
     socket.on('join_conversation', async (data) => {
-      const conversationId = data.conversationId;
-      if (!conversationId) return;
+      const conversationId = parseInt(data?.conversationId, 10);
+      if (!Number.isFinite(conversationId) || conversationId <= 0) return;
 
       // Verify membership
       try {
@@ -58,16 +67,18 @@ function initSocket(server) {
 
     // Leave conversation room
     socket.on('leave_conversation', (data) => {
-      if (data.conversationId) {
-        socket.leave(`conversation_${data.conversationId}`);
+      const conversationId = parseInt(data?.conversationId, 10);
+      if (Number.isFinite(conversationId) && conversationId > 0) {
+        socket.leave(`conversation_${conversationId}`);
       }
     });
 
     // Typing Indicators
     socket.on('typing_start', (data) => {
-      if (data.conversationId) {
-        socket.to(`conversation_${data.conversationId}`).emit('typing_status', {
-          conversationId: data.conversationId,
+      const conversationId = parseInt(data?.conversationId, 10);
+      if (Number.isFinite(conversationId) && conversationId > 0) {
+        socket.to(`conversation_${conversationId}`).emit('typing_status', {
+          conversationId,
           userId,
           isTyping: true,
         });
@@ -75,9 +86,10 @@ function initSocket(server) {
     });
 
     socket.on('typing_stop', (data) => {
-      if (data.conversationId) {
-        socket.to(`conversation_${data.conversationId}`).emit('typing_status', {
-          conversationId: data.conversationId,
+      const conversationId = parseInt(data?.conversationId, 10);
+      if (Number.isFinite(conversationId) && conversationId > 0) {
+        socket.to(`conversation_${conversationId}`).emit('typing_status', {
+          conversationId,
           userId,
           isTyping: false,
         });
@@ -86,10 +98,15 @@ function initSocket(server) {
 
     // Disconnect
     socket.on('disconnect', () => {
-      console.log(`[Socket.IO] User disconnected: ${userId}`);
-      onlineUsers.delete(String(userId));
-      onlineUsers.delete(parseInt(userId));
-      io.emit('presence_update', { userId: String(userId), status: 'offline' });
+      console.log(`[Socket.IO] User disconnected: ${userId} (socket ${socket.id})`);
+      const sockets = onlineUsers.get(userKey);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          onlineUsers.delete(userKey);
+          io.emit('presence_update', { userId: userKey, status: 'offline' });
+        }
+      }
     });
   });
 
@@ -101,8 +118,9 @@ function getIo() {
 }
 
 function isUserOnline(userId) {
-  if (!userId) return false;
-  return onlineUsers.has(String(userId)) || onlineUsers.has(parseInt(userId));
+  if (userId === null || userId === undefined) return false;
+  const sockets = onlineUsers.get(String(userId));
+  return Boolean(sockets && sockets.size > 0);
 }
 
 module.exports = {

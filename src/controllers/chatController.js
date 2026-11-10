@@ -26,7 +26,7 @@ exports.getConversations = async (req, res) => {
           cm.is_pinned,
           cm.is_muted,
           cm.is_archived,
-          cm.last_read_message_id
+          COALESCE(cm.last_read_message_id, 0) AS last_read_message_id
         FROM conversations c
         JOIN conversation_members cm ON c.id = cm.conversation_id
         WHERE cm.user_id = $1
@@ -70,7 +70,8 @@ exports.getConversations = async (req, res) => {
         ) AS last_message
         FROM messages m
         WHERE m.conversation_id = tc.id
-        ORDER BY m.created_at DESC
+          AND m.deleted_at IS NULL
+        ORDER BY m.created_at DESC, m.id DESC
         LIMIT 1
       ) lm ON TRUE
       LEFT JOIN LATERAL (
@@ -78,6 +79,7 @@ exports.getConversations = async (req, res) => {
         FROM messages m
         WHERE m.conversation_id = tc.id
           AND m.id > tc.last_read_message_id
+          AND m.deleted_at IS NULL
           AND m.sender_id != $1
       ) unr ON TRUE
       LEFT JOIN LATERAL (
@@ -96,15 +98,59 @@ exports.getConversations = async (req, res) => {
       [userId, isArchivedParam]
     );
 
-    const conversations = result.rows.map((conv) => {
+    const mapped = result.rows.map((conv) => {
       if (conv.participants && Array.isArray(conv.participants)) {
         conv.participants = conv.participants.map((p) => ({
           ...p,
           is_online: isUserOnline(p.id),
         }));
+      } else {
+        conv.participants = [];
       }
+      conv.target_user = conv.type === 'DIRECT' && conv.participants.length > 0
+        ? conv.participants[0]
+        : null;
       return conv;
     });
+
+    // Deduplicate DIRECT conversations per peer user without displacing new conversations below older ones
+    const rankDirectConv = (conv) => {
+      const hasMsg = conv.last_message ? 1 : 0;
+      const pinned = conv.is_pinned ? 1 : 0;
+      const ts = new Date(conv.last_message?.created_at || conv.updated_at || conv.created_at || 0).getTime();
+      return { hasMsg, pinned, ts };
+    };
+
+    const conversations = [];
+    const directPeerIndex = new Map();
+    for (const conv of mapped) {
+      if (conv.type === 'DIRECT') {
+        const peer = conv.target_user;
+        if (!peer || peer.id === undefined || peer.id === null) {
+          continue;
+        }
+        const peerKey = String(peer.id);
+        if (directPeerIndex.has(peerKey)) {
+          const idx = directPeerIndex.get(peerKey);
+          const existing = conversations[idx];
+          const a = rankDirectConv(existing);
+          const b = rankDirectConv(conv);
+          const bWins =
+            b.hasMsg > a.hasMsg ||
+            (b.hasMsg === a.hasMsg && (b.pinned > a.pinned || (b.pinned === a.pinned && b.ts > a.ts)));
+          const combinedUnread = (existing.unread_count || 0) + (conv.unread_count || 0);
+          if (bWins) {
+            conv.unread_count = combinedUnread;
+            conversations[idx] = conv;
+          } else {
+            existing.unread_count = combinedUnread;
+          }
+          continue;
+        }
+        directPeerIndex.set(peerKey, conversations.length);
+      }
+      conversations.push(conv);
+    }
 
     res.json({ success: true, conversations });
   } catch (err) {
@@ -118,15 +164,15 @@ exports.getConversations = async (req, res) => {
  * POST /api/chat/direct
  */
 exports.getOrCreateDirectConversation = async (req, res) => {
-  const userId = req.user.id;
+  const userId = parseInt(req.user.id, 10);
   const { targetUserId } = req.body;
+  const targetId = parseInt(targetUserId, 10);
 
-  if (!targetUserId || parseInt(targetUserId) === userId) {
+  if (!Number.isFinite(targetId) || targetId <= 0 || targetId === userId) {
     return res.status(400).json({ error: 'Valid target user ID is required.' });
   }
 
-  const targetId = parseInt(targetUserId);
-
+  let client;
   try {
     const blockStatus = await getBlockStatus(userId, targetId);
     if (blockStatus.blocked) {
@@ -136,8 +182,21 @@ exports.getOrCreateDirectConversation = async (req, res) => {
       });
     }
 
-    // Check if a direct conversation pair already exists
-    const existing = await db.query(
+    // Target user check
+    const targetUser = await db.query('SELECT name, username FROM users WHERE id = $1', [targetId]);
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json({ error: 'Target user not found.' });
+    }
+
+    client = await db.pool.connect();
+    await client.query('BEGIN');
+
+    // Serialize direct chat creation per sorted user pair to prevent race-condition duplicates
+    const lowId = Math.min(userId, targetId);
+    const highId = Math.max(userId, targetId);
+    await client.query('SELECT pg_advisory_xact_lock($1, $2)', [lowId, highId]);
+
+    const existing = await client.query(
       `SELECT c.id
        FROM conversations c
        JOIN conversation_members cm1 ON c.id = cm1.conversation_id
@@ -145,37 +204,58 @@ exports.getOrCreateDirectConversation = async (req, res) => {
        WHERE c.type = 'DIRECT'
          AND cm1.user_id = $1
          AND cm2.user_id = $2
+         AND (
+           SELECT COUNT(*) FROM conversation_members cm_cnt WHERE cm_cnt.conversation_id = c.id
+         ) = 2
+       ORDER BY (
+         c.last_message_id IS NOT NULL
+         OR EXISTS (
+           SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.deleted_at IS NULL
+         )
+       ) DESC, c.updated_at DESC, c.id ASC
        LIMIT 1`,
       [userId, targetId]
     );
 
     if (existing.rows.length > 0) {
+      await client.query('COMMIT');
+      client.release();
+      client = null;
       return res.json({ success: true, conversationId: existing.rows[0].id, isNew: false });
     }
 
-    // Target user check
-    const targetUser = await db.query('SELECT name, username FROM users WHERE id = $1', [targetId]);
-    if (targetUser.rows.length === 0) {
-      return res.status(404).json({ error: 'Target user not found.' });
-    }
-
     // Create new direct conversation
-    const newConv = await db.query(
+    const newConv = await client.query(
       `INSERT INTO conversations (type, created_by) VALUES ('DIRECT', $1) RETURNING id`,
       [userId]
     );
     const convId = newConv.rows[0].id;
 
-    // Add members
-    await db.query(
-      `INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1, $2), ($1, $3)`,
+    // Add both members idempotently
+    await client.query(
+      `INSERT INTO conversation_members (conversation_id, user_id)
+       VALUES ($1, $2), ($1, $3)
+       ON CONFLICT (conversation_id, user_id) DO NOTHING`,
       [convId, userId, targetId]
     );
 
+    await client.query('COMMIT');
+    client.release();
+    client = null;
+
     res.json({ success: true, conversationId: convId, isNew: true });
   } catch (err) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {}
+    }
     console.error('Error creating direct conversation:', err);
     res.status(500).json({ error: 'Failed to create conversation.' });
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 };
 
@@ -186,7 +266,8 @@ exports.getOrCreateDirectConversation = async (req, res) => {
 exports.getMessages = async (req, res) => {
   const userId = req.user.id;
   const { conversationId } = req.params;
-  const limit = parseInt(req.query.limit) || 50;
+  const parsedLimit = parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 200) : 50;
 
   try {
     // Verify membership
@@ -215,7 +296,8 @@ exports.getMessages = async (req, res) => {
           m.deleted_at
         FROM messages m
         WHERE m.conversation_id = $1
-        ORDER BY m.created_at ASC
+          AND m.deleted_at IS NULL
+        ORDER BY m.created_at DESC, m.id DESC
         LIMIT $2
       )
       SELECT 
@@ -263,13 +345,13 @@ exports.getMessages = async (req, res) => {
           'id', rm.id,
           'text', rm.text,
           'sender_id', rm.sender_id,
-          'sender_name', ru.name
+          'sender_name', COALESCE(ru.name, ru.username, 'User')
         ) AS reply_to_message
         FROM messages rm
         LEFT JOIN users ru ON rm.sender_id = ru.id
         WHERE rm.id = tm.reply_to_message_id
       ) rep ON TRUE
-      ORDER BY tm.created_at ASC`,
+      ORDER BY tm.created_at ASC, tm.id ASC`,
       [conversationId, limit]
     );
 
@@ -296,6 +378,12 @@ exports.sendMessage = async (req, res) => {
     latitude,
     longitude
   } = req.body;
+
+  const cleanText = typeof text === 'string' ? text.trim() : String(text || '').trim();
+  const hasGeo = latitude !== undefined && latitude !== null && longitude !== undefined && longitude !== null;
+  if (!cleanText && !req.file && !shared_entity_id && !hasGeo) {
+    return res.status(400).json({ error: 'Message content cannot be empty.' });
+  }
 
   let client;
   try {
@@ -357,6 +445,9 @@ exports.sendMessage = async (req, res) => {
       }
     }
 
+    const parsedReplyId = reply_to_message_id ? parseInt(reply_to_message_id, 10) : null;
+    const validReplyId = Number.isFinite(parsedReplyId) && parsedReplyId > 0 ? parsedReplyId : null;
+
     // Begin transaction for atomic writes
     await client.query('BEGIN');
 
@@ -370,8 +461,8 @@ exports.sendMessage = async (req, res) => {
         conversationId,
         userId,
         mediaType,
-        text || '',
-        reply_to_message_id ? parseInt(reply_to_message_id) : null,
+        cleanText,
+        validReplyId,
         shared_entity_type || null,
         shared_entity_id || null,
         latitude ? parseFloat(latitude) : null,
@@ -392,14 +483,18 @@ exports.sendMessage = async (req, res) => {
       message.attachments = [];
     }
 
-    // Update conversation timestamp
+    // Update conversation timestamp & sender's last_read_message_id
     await client.query(
       'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP, last_message_id = $1 WHERE id = $2',
       [message.id, conversationId]
     );
+    await client.query(
+      'UPDATE conversation_members SET last_read_message_id = GREATEST(COALESCE(last_read_message_id, 0), $1) WHERE conversation_id = $2 AND user_id = $3',
+      [message.id, conversationId, userId]
+    );
 
     // Insert notifications for all unmuted conversation members (excluding sender) using single set-based query
-    const notificationText = text ? text.substring(0, 80) : 'Sent a media message';
+    const notificationText = cleanText ? cleanText.substring(0, 80) : 'Sent a media message';
     await client.query(
       `INSERT INTO notifications (user_id, actor_id, type, text)
        SELECT user_id, $1, 'message', $2
@@ -408,12 +503,26 @@ exports.sendMessage = async (req, res) => {
       [userId, notificationText, conversationId]
     );
 
-    // Fetch Sender Info & recipient members inside transaction
+    // Fetch Sender Info, reply snippet & recipient members inside transaction
     const senderResult = await client.query('SELECT name, username, profile_picture FROM users WHERE id = $1', [userId]);
-    message.sender_name = senderResult.rows[0] ? senderResult.rows[0].name : '';
+    message.sender_name = senderResult.rows[0] ? (senderResult.rows[0].name || senderResult.rows[0].username || '') : '';
     message.sender_username = senderResult.rows[0] ? senderResult.rows[0].username : '';
     message.sender_profile_picture = senderResult.rows[0] ? senderResult.rows[0].profile_picture : null;
     message.reactions = [];
+    message.reply_to_message = null;
+
+    if (validReplyId) {
+      const repRes = await client.query(
+        `SELECT rm.id, rm.text, rm.sender_id, COALESCE(ru.name, ru.username, 'User') AS sender_name
+         FROM messages rm
+         LEFT JOIN users ru ON rm.sender_id = ru.id
+         WHERE rm.id = $1 AND rm.conversation_id = $2`,
+        [validReplyId, conversationId]
+      );
+      if (repRes.rows.length > 0) {
+        message.reply_to_message = repRes.rows[0];
+      }
+    }
 
     const membersResult = await client.query(
       'SELECT user_id, is_muted FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
@@ -425,13 +534,14 @@ exports.sendMessage = async (req, res) => {
     client.release();
     client = null;
 
-    // Emit Real-time Socket Event (after successful commit)
+    // Emit Real-time Socket Event once per unique connected socket (no duplicate room delivery)
     const io = getIo();
     if (io) {
-      io.to(`conversation_${conversationId}`).emit('new_message', message);
+      let broadcast = io.to(`conversation_${conversationId}`);
       for (const row of membersResult.rows) {
-        io.to(`user_${row.user_id}`).emit('new_message', message);
+        broadcast = broadcast.to(`user_${row.user_id}`);
       }
+      broadcast.emit('new_message', message);
     }
 
     return res.status(201).json({ success: true, message });
@@ -466,30 +576,49 @@ exports.toggleReaction = async (req, res) => {
   }
 
   try {
+    const msgResult = await db.query('SELECT conversation_id FROM messages WHERE id = $1', [messageId]);
+    if (msgResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Message not found.' });
+    }
+    const convId = msgResult.rows[0].conversation_id;
+
+    const memberCheck = await db.query(
+      'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+      [convId, userId]
+    );
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not authorized to react in this conversation.' });
+    }
+
     const existing = await db.query(
       'SELECT id FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3',
       [messageId, userId, emoji]
     );
 
+    let active;
     if (existing.rows.length > 0) {
       await db.query('DELETE FROM message_reactions WHERE id = $1', [existing.rows[0].id]);
+      active = false;
     } else {
       await db.query(
         'INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3)',
         [messageId, userId, emoji]
       );
+      active = true;
     }
 
-    const msgResult = await db.query('SELECT conversation_id FROM messages WHERE id = $1', [messageId]);
-    if (msgResult.rows.length > 0) {
-      const convId = msgResult.rows[0].conversation_id;
-      const io = getIo();
-      if (io) {
-        io.to(`conversation_${convId}`).emit('message_reaction', { messageId, userId, emoji });
-      }
+    const io = getIo();
+    if (io) {
+      io.to(`conversation_${convId}`).emit('message_reaction', {
+        messageId: parseInt(messageId, 10) || messageId,
+        conversationId: convId,
+        userId,
+        emoji,
+        active,
+      });
     }
 
-    res.json({ success: true });
+    res.json({ success: true, active });
   } catch (err) {
     console.error('Error toggling reaction:', err);
     res.status(500).json({ error: 'Failed to update reaction.' });
@@ -505,8 +634,16 @@ exports.markAsRead = async (req, res) => {
   const { conversationId } = req.params;
 
   try {
+    const memberCheck = await db.query(
+      'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+      [conversationId, userId]
+    );
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not authorized to access this conversation.' });
+    }
+
     const latestMsg = await db.query(
-      'SELECT id FROM messages WHERE conversation_id = $1 ORDER BY id DESC LIMIT 1',
+      'SELECT id FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL ORDER BY id DESC LIMIT 1',
       [conversationId]
     );
 
@@ -545,6 +682,9 @@ exports.togglePin = async (req, res) => {
        RETURNING is_pinned`,
       [conversationId, userId]
     );
+    if (resPin.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found.' });
+    }
     res.json({ success: true, isPinned: resPin.rows[0].is_pinned });
   } catch (err) {
     console.error('Error toggling pin:', err);
@@ -568,6 +708,9 @@ exports.toggleMute = async (req, res) => {
        RETURNING is_muted`,
       [conversationId, userId]
     );
+    if (resMute.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found.' });
+    }
     res.json({ success: true, isMuted: resMute.rows[0].is_muted });
   } catch (err) {
     console.error('Error toggling mute:', err);
@@ -591,6 +734,9 @@ exports.toggleArchive = async (req, res) => {
        RETURNING is_archived`,
       [conversationId, userId]
     );
+    if (resArc.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found.' });
+    }
     res.json({ success: true, isArchived: resArc.rows[0].is_archived });
   } catch (err) {
     console.error('Error toggling archive:', err);
