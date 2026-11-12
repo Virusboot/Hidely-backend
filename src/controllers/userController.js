@@ -1,3 +1,6 @@
+const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/db');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { ensureUserBlocksTable, getBlockStatus, isNotMutuallyBlockedSql } = require('../utils/blockHelper');
@@ -1021,4 +1024,300 @@ exports.respondToPostTag = async (req, res) => {
 exports.removePostTag = async (req, res) => {
   req.body = { ...(req.body || {}), action: 'remove' };
   return exports.respondToPostTag(req, res);
+};
+
+const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
+
+function safeUnlinkLocalUpload(rawPath) {
+  if (!rawPath || typeof rawPath !== 'string') return;
+  const trimmed = rawPath.trim();
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) return;
+  const normalizedRel = trimmed.replace(/^\/+/, '');
+  if (!normalizedRel.startsWith('uploads/')) return;
+  const candidate = path.resolve(UPLOADS_ROOT, '..', normalizedRel);
+  if (!candidate.startsWith(UPLOADS_ROOT + path.sep)) return;
+  try {
+    if (fs.existsSync(candidate)) {
+      fs.unlinkSync(candidate);
+    }
+  } catch (err) {
+    console.warn('[AccountDelete] Non-fatal file cleanup error:', err.message);
+  }
+}
+
+async function runOptionalCleanupQuery(queryFn, sql, params) {
+  try {
+    await queryFn(sql, params);
+  } catch (err) {
+    // Ignore undefined_table (42P01) or undefined_column (42703) in optional tables
+    if (!err || (err.code !== '42P01' && err.code !== '42703')) {
+      throw err;
+    }
+  }
+}
+
+async function permanentlyDeleteUserAccount(userId, emailLower, profilePicture) {
+  const postsMediaRes = await db.query('SELECT image_url FROM posts WHERE user_id = $1', [userId]);
+  const mediaToDelete = [
+    profilePicture,
+    ...postsMediaRes.rows.map((r) => r.image_url),
+  ].filter(Boolean);
+
+  const executeTx = async (q) => {
+    await runOptionalCleanupQuery(q, 'DELETE FROM otps WHERE LOWER(email) = LOWER($1)', [emailLower]);
+    await runOptionalCleanupQuery(
+      q,
+      'DELETE FROM content_reports WHERE reporter_id = $1 OR reported_user_id = $1',
+      [userId]
+    );
+    await runOptionalCleanupQuery(q, 'DELETE FROM messages WHERE sender_id = $1', [userId]);
+    await runOptionalCleanupQuery(q, 'DELETE FROM conversation_members WHERE user_id = $1', [userId]);
+    await runOptionalCleanupQuery(
+      q,
+      `DELETE FROM conversations c
+       WHERE c.type = 'DIRECT'
+         AND (
+           SELECT COUNT(*) FROM conversation_members cm WHERE cm.conversation_id = c.id
+         ) < 2`,
+      []
+    );
+    const delUserRes = await q('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+    if (delUserRes.rows.length === 0) {
+      return false;
+    }
+    return true;
+  };
+
+  let deleted = false;
+  if (db.pool && typeof db.pool.connect === 'function') {
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      deleted = await executeTx((sql, params) => client.query(sql, params));
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  } else {
+    deleted = await executeTx((sql, params) => db.query(sql, params));
+  }
+
+  if (deleted) {
+    for (const m of mediaToDelete) {
+      safeUnlinkLocalUpload(m);
+    }
+  }
+  return deleted;
+}
+
+/**
+ * Permanently Delete Authenticated User Account & Personal Data
+ * DELETE /api/users/account  (and POST /api/users/account/delete)
+ */
+exports.deleteAccount = async (req, res) => {
+  const userId = req.user.id;
+  const password = (req.body && req.body.password ? req.body.password : '').toString();
+
+  if (!password) {
+    return res.status(400).json({ error: 'Current password confirmation is required to permanently delete your account.' });
+  }
+
+  try {
+    const userRes = await db.query(
+      'SELECT id, email, password_hash, profile_picture FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const user = userRes.rows[0];
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Incorrect password. Account deletion aborted.' });
+    }
+
+    const deleted = await permanentlyDeleteUserAccount(user.id, user.email, user.profile_picture);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your account and associated personal data have been permanently deleted.',
+    });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    return res.status(500).json({ error: 'Failed to delete account. Please try again later.' });
+  }
+};
+
+/**
+ * Public Web Account Deletion Endpoint (Google Play Account Deletion Web URL Requirement)
+ * POST /api/users/web-delete-account
+ */
+exports.webDeleteAccount = async (req, res) => {
+  const { email, password, confirm } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email address and current password are required.' });
+  }
+
+  if (confirm !== true && confirm !== 'DELETE') {
+    return res.status(400).json({ error: 'Please type DELETE or confirm permanent account deletion.' });
+  }
+
+  try {
+    const emailLower = email.toString().toLowerCase().trim();
+    const userRes = await db.query(
+      'SELECT id, email, password_hash, profile_picture, COALESCE(is_admin, false) AS is_admin FROM users WHERE LOWER(email) = $1 LIMIT 1',
+      [emailLower]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const user = userRes.rows[0];
+    const isMatch = await bcrypt.compare(password.toString(), user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    await permanentlyDeleteUserAccount(user.id, user.email, user.profile_picture);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your Hidely account and personal data have been permanently deleted.',
+    });
+  } catch (error) {
+    console.error('Error in webDeleteAccount:', error);
+    return res.status(500).json({ error: 'Server error processing deletion request.' });
+  }
+};
+
+/**
+ * Export Authenticated User Personal Data (DPDP Act 2023 Sec. 11 Right to Access)
+ * GET /api/users/data-export
+ */
+exports.exportUserData = async (req, res) => {
+  const userId = req.user.id;
+
+  const safeQuery = async (sql, params) => {
+    try {
+      const r = await db.query(sql, params);
+      return r.rows;
+    } catch (err) {
+      if (err && (err.code === '42P01' || err.code === '42703')) {
+        return [];
+      }
+      throw err;
+    }
+  };
+
+  try {
+    const profileRows = await safeQuery(
+      `SELECT id, name, email, username, pronouns, COALESCE(gender, '') AS gender,
+              bio, profile_picture, is_verified, COALESCE(total_points, points, 0) AS points,
+              COALESCE(current_level, 1) AS current_level,
+              COALESCE(allow_tags_from, 'everyone') AS allow_tags_from,
+              COALESCE(allow_mentions_from, 'everyone') AS allow_mentions_from,
+              COALESCE(manually_approve_tags, FALSE) AS manually_approve_tags,
+              created_at, updated_at
+       FROM users
+       WHERE id = $1`,
+      [userId]
+    );
+
+    if (profileRows.length === 0) {
+      return res.status(404).json({ error: 'User profile not found.' });
+    }
+
+    const [
+      posts,
+      comments,
+      bookmarks,
+      followers,
+      following,
+      blockedUsers,
+      pointTransactions,
+      notifications,
+      reportsSubmitted,
+    ] = await Promise.all([
+      safeQuery(
+        `SELECT id, caption, image_url, location, category, latitude, longitude,
+                canonical_name, city, state, country, likes_count, created_at
+         FROM posts WHERE user_id = $1 ORDER BY created_at DESC`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT id, post_id, text, created_at
+         FROM post_comments WHERE user_id = $1 ORDER BY created_at DESC`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT post_id, created_at
+         FROM post_bookmarks WHERE user_id = $1 ORDER BY created_at DESC`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT u.id, u.username, u.name, uf.created_at
+         FROM user_follows uf JOIN users u ON uf.follower_id = u.id
+         WHERE uf.following_id = $1`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT u.id, u.username, u.name, uf.created_at
+         FROM user_follows uf JOIN users u ON uf.following_id = u.id
+         WHERE uf.follower_id = $1`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT u.id, u.username, ub.created_at
+         FROM user_blocks ub JOIN users u ON ub.blocked_id = u.id
+         WHERE ub.blocker_id = $1`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT id, event_type, points, description, created_at
+         FROM point_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 500`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT id, type, text, post_id, is_read, created_at
+         FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200`,
+        [userId]
+      ),
+      safeQuery(
+        `SELECT id, target_type, target_id, target_name, reason, details, status, created_at
+         FROM content_reports WHERE reporter_id = $1 ORDER BY created_at DESC`,
+        [userId]
+      ),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      exported_at: new Date().toISOString(),
+      notice: 'Generated per the Digital Personal Data Protection Act, 2023 (India) right to access personal data.',
+      data: {
+        profile: profileRows[0],
+        posts,
+        comments,
+        saved_post_ids: bookmarks,
+        followers,
+        following,
+        blocked_users: blockedUsers,
+        point_transactions: pointTransactions,
+        notifications,
+        reports_submitted: reportsSubmitted,
+      },
+    });
+  } catch (error) {
+    console.error('Error exporting user data:', error);
+    return res.status(500).json({ error: 'Failed to export personal data.' });
+  }
 };

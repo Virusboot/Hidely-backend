@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./config/db');
 const { JWT_SECRET } = require('./config/jwt');
 const { getSocketCorsConfig } = require('./config/corsConfig');
+const { verifyActiveSession } = require('./middleware/authMiddleware');
 
 let io = null;
 const onlineUsers = new Map(); // String(userId) -> Set<socketId>
@@ -20,6 +21,10 @@ function initSocket(server) {
         return next(new Error('Authentication token missing'));
       }
       const decoded = jwt.verify(token, JWT_SECRET);
+      const sessionCheck = await verifyActiveSession(decoded);
+      if (!sessionCheck.valid) {
+        return next(new Error(sessionCheck.reason || 'Session revoked'));
+      }
       socket.userId = decoded.id;
       next();
     } catch (err) {

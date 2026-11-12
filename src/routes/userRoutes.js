@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { accountActionLimiter } = require('../middleware/rateLimiter');
 const upload = require('../middleware/upload');
 
 // Fetch current user details (private)
@@ -9,6 +10,12 @@ router.get('/profile', authMiddleware, userController.getProfile);
 
 // Update current user details (private, allows optional file upload)
 router.put('/profile', authMiddleware, upload.single('avatar'), userController.updateProfile);
+
+// DPDP Act Data Export & Play Store Permanent Account Deletion
+router.get('/data-export', authMiddleware, accountActionLimiter, userController.exportUserData);
+router.delete('/account', authMiddleware, accountActionLimiter, userController.deleteAccount);
+router.post('/account/delete', authMiddleware, accountActionLimiter, userController.deleteAccount);
+router.post('/web-delete-account', accountActionLimiter, userController.webDeleteAccount);
 
 // Fetch another creator's profile by username (public, optional auth to verify follow status)
 router.get('/profile/:username', authMiddleware.optional, userController.getCreatorProfile);

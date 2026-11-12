@@ -16,6 +16,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
 const mapRoutes = require('./routes/mapRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const { initSocket } = require('./socket');
 
 const app = express();
@@ -48,6 +49,7 @@ const staticCacheOptions = {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
   },
 };
 
@@ -103,6 +105,143 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/map', mapRoutes);
+app.use('/api/reports', reportRoutes);
+
+// Public Legal & Google Play Policy Pages (Data Deletion URL, Privacy Policy, Terms, Child Safety)
+app.get('/delete-account', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delete Your Hidely Account &amp; Data</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1c0d5a; margin: 0; padding: 24px; }
+    .card { max-width: 520px; margin: 32px auto; background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 8px 30px rgba(28, 13, 90, 0.08); }
+    h1 { margin-top: 0; font-size: 22px; }
+    p { font-size: 14px; line-height: 1.55; color: #475569; }
+    label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 13px; }
+    input { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
+    button { margin-top: 18px; width: 100%; padding: 13px; background: #dc2626; color: #fff; border: 0; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; }
+    .msg { margin-top: 14px; padding: 12px; border-radius: 10px; font-size: 13px; display: none; }
+    .msg.ok { display: block; background: #ecfdf5; color: #065f46; }
+    .msg.err { display: block; background: #fef2f2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Permanent Account &amp; Data Deletion — Hidely</h1>
+    <p>Enter your registered email address and password below to permanently erase your Hidely profile, posts, photos/videos, comments, messages, and location records. This action cannot be undone.</p>
+    <form id="delForm">
+      <label for="email">Registered Email</label>
+      <input id="email" type="email" required placeholder="you@example.com" />
+      <label for="password">Password</label>
+      <input id="password" type="password" required placeholder="Current password" />
+      <label for="confirm">Type <strong>DELETE</strong> to confirm</label>
+      <input id="confirm" type="text" required placeholder="DELETE" />
+      <button type="submit">Permanently Delete Account</button>
+    </form>
+    <div id="statusMsg" class="msg"></div>
+    <p style="margin-top:20px;font-size:12px;">Need assistance? Contact Privacy Support at <strong>support@hidely.app</strong> or Grievance Officer at <strong>grievance@hidely.app</strong>.</p>
+  </div>
+  <script>
+    document.getElementById('delForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var msgEl = document.getElementById('statusMsg');
+      msgEl.className = 'msg';
+      msgEl.textContent = '';
+      var email = document.getElementById('email').value.trim();
+      var password = document.getElementById('password').value;
+      var confirmText = document.getElementById('confirm').value.trim();
+      if (confirmText !== 'DELETE') {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Please type DELETE in the confirmation box.';
+        return;
+      }
+      try {
+        var res = await fetch('/api/users/web-delete-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: password, confirm: 'DELETE' })
+        });
+        var data = await res.json();
+        if (res.ok) {
+          msgEl.className = 'msg ok';
+          msgEl.textContent = data.message || 'Account permanently deleted.';
+          document.getElementById('delForm').reset();
+        } else {
+          msgEl.className = 'msg err';
+          msgEl.textContent = data.error || 'Unable to delete account.';
+        }
+      } catch (err) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Network error. Please try again.';
+      }
+    });
+  </script>
+</body>
+</html>`);
+});
+
+app.get('/privacy-policy', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.send(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hidely Privacy Policy</title>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:32px auto;padding:0 20px;color:#1e293b;line-height:1.6}h1,h2{color:#1c0d5a}</style></head>
+<body>
+<h1>Hidely Privacy Policy</h1>
+<p><strong>Effective Date:</strong> July 16, 2026</p>
+<p>Hidely respects your privacy and processes personal data in accordance with the Digital Personal Data Protection Act, 2023 (India), Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, and app store platform requirements.</p>
+<h2>1. Data We Collect</h2>
+<p>Account information (name, username, email address, hashed password), user-generated posts/comments/messages, media metadata, and foreground GPS coordinates solely with your permission.</p>
+<h2>2. Service Providers &amp; SDKs</h2>
+<p>We process data through infrastructure providers strictly to operate app features: Render/PostgreSQL (backend &amp; database hosting), Cloudinary (media storage), Google Maps / OpenStreetMap Nominatim &amp; Photon (location discovery &amp; geocoding), ZegoCloud (voice/video calls), Resend/SMTP (transactional OTP emails), and optional Gemini AI place verification. We do not sell user data or serve behavioral third-party ads.</p>
+<h2>3. Data Rights &amp; Account Deletion</h2>
+<p>You may download your personal data in-app under Settings &amp; Privacy &rarr; Download My Data, or permanently delete your account inside the app or online at <a href="/delete-account">/delete-account</a>.</p>
+<h2>4. Child Safety (Zero Tolerance CSAE)</h2>
+<p>Hidely strictly prohibits Child Sexual Abuse and Exploitation (CSAE). Accounts must be 18+ years old. See <a href="/child-safety">/child-safety</a>.</p>
+<h2>5. Grievance Officer (IT Rules 2021)</h2>
+<p>Grievance Officer: <strong>grievance@hidely.app</strong> | General Support: <strong>support@hidely.app</strong>. Complaints are acknowledged within 24 hours and resolved within 15 days (24 hours for urgent safety/CSAE takedowns).</p>
+</body></html>`);
+});
+
+app.get('/terms', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.send(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hidely Terms of Service</title>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:32px auto;padding:0 20px;color:#1e293b;line-height:1.6}h1,h2{color:#1c0d5a}</style></head>
+<body>
+<h1>Hidely Terms of Service</h1>
+<p><strong>Effective Date:</strong> July 16, 2026</p>
+<h2>1. Eligibility</h2>
+<p>You must be at least 18 years old to register or use Hidely.</p>
+<h2>2. Community Conduct &amp; Zero Tolerance Moderation</h2>
+<p>Users may not upload illegal, abusive, defamatory, sexually explicit, or Child Sexual Abuse and Exploitation (CSAE) content. Violating content and accounts are removed within 24 hours.</p>
+<h2>3. Non-Monetary Explorer Points &amp; Preview Features</h2>
+<p>In-app XP, levels, and badges are non-monetary recognition metrics with zero cash, wallet, or INR redemption value. Directory previews marked Coming Soon do not process live financial transactions or bookings.</p>
+<h2>4. Grievance &amp; Legal Contact</h2>
+<p>Support: support@hidely.app | Grievance Officer: grievance@hidely.app</p>
+</body></html>`);
+});
+
+app.get('/child-safety', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.send(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hidely Child Safety Standards</title>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:32px auto;padding:0 20px;color:#1e293b;line-height:1.6}h1,h2{color:#1c0d5a}</style></head>
+<body>
+<h1>Hidely Child Safety &amp; CSAE Zero-Tolerance Policy</h1>
+<p>Hidely enforces a strict zero-tolerance policy against Child Sexual Abuse Material (CSAM) and Child Sexual Exploitation and Abuse (CSAE). All Hidely accounts require 18+ age confirmation.</p>
+<h2>In-App Reporting &amp; Rapid Takedown</h2>
+<p>Any user can report content or profiles under "Child Safety / CSAE" using the report option on every post, reel, and profile. Reported accounts and content are queued immediately for urgent safety review and removed within 24 hours, with reporting to relevant legal authorities (e.g., NCMEC / Indian cybercrime authorities) where required by law.</p>
+<h2>Safety Contact</h2>
+<p>Dedicated Child Safety / Grievance Contact: <strong>grievance@hidely.app</strong></p>
+</body></html>`);
+});
 
 // Serve Unified Hidely Web Platform at Root /
 const websiteDir = path.join(__dirname, '../public/website');
@@ -185,7 +324,31 @@ const startServer = async () => {
         ADD COLUMN IF NOT EXISTS featured_badge_id INTEGER,
         ADD COLUMN IF NOT EXISTS allow_tags_from VARCHAR(20) DEFAULT 'everyone',
         ADD COLUMN IF NOT EXISTS allow_mentions_from VARCHAR(20) DEFAULT 'everyone',
-        ADD COLUMN IF NOT EXISTS manually_approve_tags BOOLEAN DEFAULT FALSE;
+        ADD COLUMN IF NOT EXISTS manually_approve_tags BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS accepted_terms_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS is_adult_confirmed BOOLEAN DEFAULT TRUE;
+
+        ALTER TABLE otps
+        ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+
+        CREATE TABLE IF NOT EXISTS content_reports (
+          id SERIAL PRIMARY KEY,
+          reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          target_type VARCHAR(30) NOT NULL,
+          target_id INTEGER,
+          reported_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          target_name VARCHAR(255) DEFAULT '',
+          reason VARCHAR(80) NOT NULL,
+          details TEXT DEFAULT '',
+          status VARCHAR(30) NOT NULL DEFAULT 'pending',
+          admin_note TEXT DEFAULT '',
+          reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          reviewed_at TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_content_reports_status ON content_reports (status, created_at DESC);
 
         CREATE TABLE IF NOT EXISTS user_blocks (
           blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -282,7 +445,14 @@ const gracefulShutdown = async (signal) => {
   }
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+if (require.main === module) {
+  if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || !process.env.DATABASE_URL)) {
+    console.error('FATAL PRODUCTION ERROR: Missing required JWT_SECRET or DATABASE_URL. Aborting startup.');
+    process.exit(1);
+  }
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  startServer();
+}
 
-startServer();
+module.exports = { app, server, startServer };

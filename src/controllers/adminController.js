@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { JWT_SECRET } = require('../config/jwt');
+const { ensureReportsTable } = require('./reportController');
 
 /**
  * Admin Login
@@ -33,7 +34,13 @@ const loginAdmin = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, username: user.username, isAdmin: true },
+      {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        isAdmin: true,
+        tv: Number(user.token_version || 0),
+      },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -438,6 +445,89 @@ exports.updateRewardConfig = (req, res) => {
   return res.status(400).json({ success: false, error: 'Invalid configuration payload.' });
 };
 
+/**
+ * Get Content Moderation Reports Queue
+ * GET /api/admin/reports
+ */
+const getReports = async (req, res) => {
+  try {
+    await ensureReportsTable();
+    const { status } = req.query;
+    const params = [];
+    let sql = `
+      SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.reported_user_id,
+             r.target_name, r.reason, r.details, r.status, r.admin_note,
+             r.reviewed_by, r.reviewed_at, r.created_at,
+             rep.username AS reporter_username,
+             ru.username AS reported_username
+      FROM content_reports r
+      LEFT JOIN users rep ON r.reporter_id = rep.id
+      LEFT JOIN users ru ON r.reported_user_id = ru.id
+      WHERE 1=1
+    `;
+    if (status && ['pending', 'reviewed', 'dismissed', 'action_taken'].includes(status)) {
+      params.push(status);
+      sql += ` AND r.status = $${params.length}`;
+    }
+    sql += ` ORDER BY (CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END) ASC, r.created_at DESC LIMIT 200`;
+
+    const result = await db.query(sql, params);
+    return res.json({ reports: result.rows });
+  } catch (error) {
+    console.error('Get Reports Error:', error);
+    return res.status(500).json({ error: 'Failed to fetch reports queue.' });
+  }
+};
+
+/**
+ * Moderate a Content Report (Dismiss / Mark Reviewed / Take Down Post / Delete Offending User)
+ * PATCH /api/admin/reports/:id
+ */
+const moderateReport = async (req, res) => {
+  try {
+    await ensureReportsTable();
+    const reportId = parseInt(req.params.id, 10);
+    const { status, action, adminNote } = req.body || {};
+
+    const cleanStatus = status || (action === 'dismiss' ? 'dismissed' : action ? 'action_taken' : 'reviewed');
+    if (!['pending', 'reviewed', 'dismissed', 'action_taken'].includes(cleanStatus)) {
+      return res.status(400).json({ error: 'Invalid report moderation status.' });
+    }
+
+    const reportRes = await db.query('SELECT * FROM content_reports WHERE id = $1', [reportId]);
+    if (reportRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Report not found.' });
+    }
+    const report = reportRes.rows[0];
+
+    if (action === 'remove_content' && report.target_id && ['post', 'reel'].includes((report.target_type || '').toLowerCase())) {
+      await db.query('DELETE FROM posts WHERE id = $1', [report.target_id]);
+    } else if (action === 'remove_user' && report.reported_user_id) {
+      await db.query('DELETE FROM users WHERE id = $1 AND is_admin = false', [report.reported_user_id]);
+    }
+
+    const updatedRes = await db.query(
+      `UPDATE content_reports
+       SET status = $1,
+           admin_note = COALESCE($2, admin_note),
+           reviewed_by = $3,
+           reviewed_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING *`,
+      [cleanStatus, adminNote || null, req.admin ? req.admin.id : null, reportId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Report moderation updated.',
+      report: updatedRes.rows[0],
+    });
+  } catch (error) {
+    console.error('Moderate Report Error:', error);
+    return res.status(500).json({ error: 'Failed to update report moderation.' });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getDashboardStats,
@@ -451,6 +541,8 @@ module.exports = {
   getPosts,
   deletePost,
   broadcastNotification,
+  getReports,
+  moderateReport,
   getRewardConfig: exports.getRewardConfig,
   updateRewardConfig: exports.updateRewardConfig,
 };

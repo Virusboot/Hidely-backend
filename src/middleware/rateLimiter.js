@@ -3,7 +3,7 @@
 const rateLimitStore = new Map();
 
 // Periodic cleanup of expired rate limit entries every 5 minutes
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, data] of rateLimitStore.entries()) {
     if (now > data.resetTime) {
@@ -11,6 +11,9 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+if (cleanupInterval.unref) {
+  cleanupInterval.unref();
+}
 
 /**
  * Creates a rate-limiting middleware instance.
@@ -24,9 +27,10 @@ function createRateLimiter({
     // Extract real client IP behind proxies
     const clientIp = req.headers['x-forwarded-for']
       ? req.headers['x-forwarded-for'].split(',')[0].trim()
-      : req.ip || req.socket.remoteAddress || 'unknown-ip';
+      : req.ip || (req.socket && req.socket.remoteAddress) || 'unknown-ip';
 
-    const key = `${req.path}:${clientIp}`;
+    const routeScope = `${req.baseUrl || ''}${req.path || ''}`;
+    const key = `${routeScope}:${clientIp}`;
     const now = Date.now();
 
     let record = rateLimitStore.get(key);
@@ -83,5 +87,25 @@ module.exports = {
     windowMs: 15 * 60 * 1000,
     max: 5,
     message: 'Too many password reset submissions. Please try again after 15 minutes.',
+  }),
+  availabilityLimiter: createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: 'Too many availability checks. Please slow down and try again shortly.',
+  }),
+  mapLimiter: createRateLimiter({
+    windowMs: 5 * 60 * 1000,
+    max: 120,
+    message: 'Too many map requests. Please try again shortly.',
+  }),
+  reportLimiter: createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Too many report submissions. Please try again later.',
+  }),
+  accountActionLimiter: createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many sensitive account requests. Please try again after 15 minutes.',
   }),
 };

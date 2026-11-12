@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const https = require('https');
+const { mapLimiter } = require('../middleware/rateLimiter');
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCNU24xs5Ky9uQ3pHfhyv9ofkjUd_o5_yI';
+const GOOGLE_MAPS_API_KEY = (process.env.GOOGLE_MAPS_API_KEY || '').trim();
+
+router.use(mapLimiter);
 
 function fetchJson(url, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -180,15 +183,17 @@ router.get('/geocode', async (req, res) => {
       return res.status(400).json({ error: 'Address parameter is required' });
     }
 
-    // Try Google Maps first
-    try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
-      const result = await fetchJson(url);
-      if (result.statusCode === 200 && result.body && result.body.status === 'OK' && result.body.results && result.body.results.length > 0) {
-        return res.status(200).json(result.body);
+    // Try Google Maps first (when server API key is configured)
+    if (GOOGLE_MAPS_API_KEY) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
+        const result = await fetchJson(url);
+        if (result.statusCode === 200 && result.body && result.body.status === 'OK' && result.body.results && result.body.results.length > 0) {
+          return res.status(200).json(result.body);
+        }
+      } catch (gErr) {
+        console.warn('[MapProxy] Google Geocode failed, using Photon fallback:', gErr.message);
       }
-    } catch (gErr) {
-      console.warn('[MapProxy] Google Geocode failed, using Photon fallback:', gErr.message);
     }
 
     // Fallback: Photon Geocoder (Free OpenStreetMap based)
@@ -226,6 +231,9 @@ router.get('/places/nearby', async (req, res) => {
     if (!location) {
       return res.status(400).json({ error: 'Location parameter (lat,lng) is required' });
     }
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(200).json({ status: 'ZERO_RESULTS', results: [] });
+    }
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${encodeURIComponent(location)}&radius=${radius}&type=${encodeURIComponent(type)}&key=${GOOGLE_MAPS_API_KEY}`;
     const result = await fetchJson(url);
     res.status(result.statusCode).json(result.body);
@@ -242,6 +250,9 @@ router.get('/places/textsearch', async (req, res) => {
     if (!query) {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(200).json({ status: 'ZERO_RESULTS', results: [] });
+    }
     const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}`;
     const result = await fetchJson(url);
     res.status(result.statusCode).json(result.body);
@@ -257,6 +268,9 @@ router.get('/directions', async (req, res) => {
     const { origin, destination, mode = 'driving', language = 'en', alternatives = 'true' } = req.query;
     if (!origin || !destination) {
       return res.status(400).json({ error: 'Origin and destination parameters are required' });
+    }
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(200).json({ status: 'ZERO_RESULTS', routes: [] });
     }
     let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=${mode}&language=${language}&alternatives=${alternatives}&key=${GOOGLE_MAPS_API_KEY}`;
     if (mode === 'driving') {
@@ -282,16 +296,18 @@ router.get('/autocomplete', async (req, res) => {
     const parsedLng = parseFloat(lng);
     const hasBias = isValidCoordPair(parsedLat, parsedLng);
 
-    // Try Google Maps first
-    try {
-      const biasParam = hasBias ? `&location=${parsedLat},${parsedLng}&radius=50000` : '';
-      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}${biasParam}&key=${GOOGLE_MAPS_API_KEY}`;
-      const result = await fetchJson(url);
-      if (result.statusCode === 200 && result.body && result.body.status === 'OK' && result.body.predictions && result.body.predictions.length > 0) {
-        return res.status(200).json(result.body);
+    // Try Google Maps first (when server API key is configured)
+    if (GOOGLE_MAPS_API_KEY) {
+      try {
+        const biasParam = hasBias ? `&location=${parsedLat},${parsedLng}&radius=50000` : '';
+        const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}${biasParam}&key=${GOOGLE_MAPS_API_KEY}`;
+        const result = await fetchJson(url);
+        if (result.statusCode === 200 && result.body && result.body.status === 'OK' && result.body.predictions && result.body.predictions.length > 0) {
+          return res.status(200).json(result.body);
+        }
+      } catch (gErr) {
+        console.warn('[MapProxy] Google Autocomplete failed, using Photon fallback:', gErr.message);
       }
-    } catch (gErr) {
-      console.warn('[MapProxy] Google Autocomplete failed, using Photon fallback:', gErr.message);
     }
 
     // Fallback: Photon Autocomplete (Free OpenStreetMap based, no key required)
@@ -373,6 +389,10 @@ router.get('/details', async (req, res) => {
       }
     }
 
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(200).json({ status: 'ZERO_RESULTS', result: null });
+    }
+
     // Try Google Maps
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_MAPS_API_KEY}`;
     const result = await fetchJson(url);
@@ -380,6 +400,48 @@ router.get('/details', async (req, res) => {
   } catch (error) {
     console.error('[MapProxy] Place details error:', error);
     res.status(500).json({ error: 'Failed to get place details' });
+  }
+});
+
+// 6b. Secure Place Photo Proxy (never exposes server Google key to client)
+router.get('/photo', async (req, res) => {
+  try {
+    const photoRef = (req.query.photo_reference || '').toString().trim();
+    const rawWidth = parseInt(req.query.maxwidth, 10);
+    const maxwidth = Number.isInteger(rawWidth) && rawWidth >= 100 && rawWidth <= 1600 ? rawWidth : 800;
+
+    if (!/^[A-Za-z0-9_-]{10,450}$/.test(photoRef)) {
+      return res.status(400).json({ error: 'Invalid photo_reference parameter.' });
+    }
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(404).end();
+    }
+
+    const upstreamUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${encodeURIComponent(photoRef)}&key=${GOOGLE_MAPS_API_KEY}`;
+    const fetchPhoto = (targetUrl, depth = 0) => {
+      if (depth > 3) {
+        return res.status(502).end();
+      }
+      https.get(targetUrl, (upstreamRes) => {
+        if (upstreamRes.statusCode >= 300 && upstreamRes.statusCode < 400 && upstreamRes.headers.location) {
+          upstreamRes.resume();
+          return fetchPhoto(upstreamRes.headers.location, depth + 1);
+        }
+        if (upstreamRes.statusCode !== 200) {
+          upstreamRes.resume();
+          return res.status(upstreamRes.statusCode || 404).end();
+        }
+        res.setHeader('Content-Type', upstreamRes.headers['content-type'] || 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        upstreamRes.pipe(res);
+      }).on('error', () => {
+        if (!res.headersSent) res.status(502).end();
+      });
+    };
+    fetchPhoto(upstreamUrl);
+  } catch (error) {
+    console.error('[MapProxy] Place photo error:', error);
+    return res.status(500).end();
   }
 });
 
@@ -395,18 +457,20 @@ router.get('/reverse-geocode', async (req, res) => {
       return res.status(400).json({ error: 'Valid lat and lng parameters are required' });
     }
 
-    // 1. Google Maps Reverse Geocoding
-    try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_MAPS_API_KEY}`;
-      const result = await fetchJson(url);
-      if (result.statusCode === 200 && result.body && result.body.status === 'OK') {
-        const parsed = parseGoogleReverseResults(result.body.results, lat, lng);
-        if (parsed) {
-          return res.status(200).json(parsed);
+    // 1. Google Maps Reverse Geocoding (when server API key is configured)
+    if (GOOGLE_MAPS_API_KEY) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_MAPS_API_KEY}`;
+        const result = await fetchJson(url);
+        if (result.statusCode === 200 && result.body && result.body.status === 'OK') {
+          const parsed = parseGoogleReverseResults(result.body.results, lat, lng);
+          if (parsed) {
+            return res.status(200).json(parsed);
+          }
         }
+      } catch (gErr) {
+        console.warn('[MapProxy] Google Reverse Geocode failed:', gErr.message);
       }
-    } catch (gErr) {
-      console.warn('[MapProxy] Google Reverse Geocode failed:', gErr.message);
     }
 
     // 2. OpenStreetMap Nominatim (zoom=18 for pinpoint landmarks & localities)

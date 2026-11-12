@@ -13,10 +13,12 @@ function securityHeaders(req, res, next) {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   // Referrer policy
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  // Content Security Policy compatible with web app, static admin, and Socket.IO
+  // Restrict sensitive browser APIs by default
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self), payment=()');
+  // Content Security Policy compatible with web app, static admin, and Socket.IO (without unsafe-eval)
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss: ws:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:;"
+    "default-src 'self' https: data: blob: 'unsafe-inline'; script-src 'self' https: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' https: 'unsafe-inline'; connect-src 'self' https: wss: ws:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; font-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
   );
   next();
 }

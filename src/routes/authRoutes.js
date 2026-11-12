@@ -8,13 +8,14 @@ const {
   otpLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  availabilityLimiter,
 } = require('../middleware/rateLimiter');
 
 // Registration route
 router.post('/register', registerLimiter, authController.register);
 
 // Check Email or Username availability
-router.post('/check-availability', authController.checkAvailability);
+router.post('/check-availability', availabilityLimiter, authController.checkAvailability);
 
 // Send Email Verification OTP (during signup)
 router.post('/send-email-otp', otpLimiter, authController.sendEmailOTP);

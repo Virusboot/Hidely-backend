@@ -13,7 +13,6 @@ const defaultProdOrigins = [
   'https://admin.hidely.app',
   'https://hidely-backend.onrender.com',
   'https://hidely.kittuvirusstudio.in',
-  'http://hidely.kittuvirusstudio.in',
 ];
 
 const defaultDevOrigins = [
