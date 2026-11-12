@@ -197,7 +197,7 @@ app.get('/privacy-policy', (req, res) => {
 <h2>1. Data We Collect</h2>
 <p>Account information (name, username, email address, hashed password), user-generated posts/comments/messages, media metadata, and foreground GPS coordinates solely with your permission.</p>
 <h2>2. Service Providers &amp; SDKs</h2>
-<p>We process data through infrastructure providers strictly to operate app features: Render/PostgreSQL (backend &amp; database hosting), Cloudinary (media storage), Google Maps / OpenStreetMap Nominatim &amp; Photon (location discovery &amp; geocoding), ZegoCloud (voice/video calls), Resend/SMTP (transactional OTP emails), and optional Gemini AI place verification. We do not sell user data or serve behavioral third-party ads.</p>
+<p>We process data through infrastructure providers strictly to operate app features: Render/PostgreSQL (backend &amp; database hosting), Cloudinary (media storage), Google Maps / OpenStreetMap Nominatim &amp; Photon (location discovery &amp; geocoding), encrypted peer-to-peer WebRTC (user-initiated voice/video calls), Resend/SMTP (transactional OTP emails), and optional Gemini AI place verification. We do not sell user data or serve behavioral third-party ads.</p>
 <h2>3. Data Rights &amp; Account Deletion</h2>
 <p>You may download your personal data in-app under Settings &amp; Privacy &rarr; Download My Data, or permanently delete your account inside the app or online at <a href="/delete-account">/delete-account</a>.</p>
 <h2>4. Child Safety (Zero Tolerance CSAE)</h2>

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../config/db');
 const { getIo, isUserOnline } = require('../socket');
 const { uploadToCloudinary } = require('../config/cloudinary');
@@ -741,5 +742,61 @@ exports.toggleArchive = async (req, res) => {
   } catch (err) {
     console.error('Error toggling archive:', err);
     res.status(500).json({ error: 'Failed to toggle archive state.' });
+  }
+};
+
+/**
+ * Get ICE / STUN / TURN Server Configuration for WebRTC Calls
+ * GET /api/chat/ice-servers
+ */
+exports.getIceServers = async (req, res) => {
+  try {
+    const userId = req.user?.id || 'guest';
+    const iceServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+    ];
+
+    const turnUrl = (process.env.TURN_URL || '').trim();
+    const turnTlsUrl = (process.env.TURN_URL_TLS || '').trim();
+    const turnSecret = (process.env.TURN_SECRET || '').trim();
+    const staticUser = (process.env.TURN_USERNAME || '').trim();
+    const staticCred = (process.env.TURN_CREDENTIAL || '').trim();
+
+    if (turnUrl && (turnUrl.startsWith('turn:') || turnUrl.startsWith('turns:'))) {
+      let username = staticUser;
+      let credential = staticCred;
+
+      if (turnSecret) {
+        const ttlSeconds = 86400;
+        const expiry = Math.floor(Date.now() / 1000) + ttlSeconds;
+        username = `${expiry}:${userId}`;
+        credential = crypto
+          .createHmac('sha1', turnSecret)
+          .update(username)
+          .digest('base64');
+      }
+
+      if (username && credential) {
+        iceServers.push({ urls: turnUrl, username, credential });
+        if (!turnUrl.includes('?transport=')) {
+          iceServers.push({ urls: `${turnUrl}?transport=tcp`, username, credential });
+        }
+        if (turnTlsUrl && turnTlsUrl.startsWith('turns:')) {
+          iceServers.push({ urls: turnTlsUrl, username, credential });
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      iceServers,
+      ttlSeconds: 86400,
+    });
+  } catch (err) {
+    console.error('[ChatController] Failed generating ICE server config');
+    return res.status(500).json({ error: 'Failed to load ICE server configuration.' });
   }
 };

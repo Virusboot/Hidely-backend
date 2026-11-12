@@ -7,6 +7,7 @@ const chatController = require('../controllers/chatController');
 router.use(authMiddleware);
 
 router.get('/conversations', chatController.getConversations);
+router.get('/ice-servers', chatController.getIceServers);
 router.post('/direct', chatController.getOrCreateDirectConversation);
 router.get('/conversations/:conversationId/messages', chatController.getMessages);
 router.post('/conversations/:conversationId/messages', upload.chatMedia.single('media'), chatController.sendMessage);
