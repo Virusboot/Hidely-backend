@@ -28,3 +28,4 @@ CREATE TABLE IF NOT EXISTS content_reports (
 
 CREATE INDEX IF NOT EXISTS idx_content_reports_status ON content_reports (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_content_reports_reporter ON content_reports (reporter_id, created_at DESC);
+

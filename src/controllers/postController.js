@@ -937,7 +937,10 @@ exports.addComment = async (req, res) => {
     const comment = {
       ...result.rows[0],
       ...userResult.rows[0],
+      id: result.rows[0].id, // Ensure comment ID is preserved, not overwritten by commenter's user ID
       user_id: userId,
+      likes_count: 0,
+      is_liked: false,
     };
 
     const actorName = userResult.rows[0].name || userResult.rows[0].username || 'Someone';

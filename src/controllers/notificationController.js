@@ -64,10 +64,12 @@ exports.getNotifications = async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 30));
   const offset = (page - 1) * limit;
+  const includeChat = req.query.include_chat === 'true';
 
   try {
     await ensureUserBlocksTable();
     const blockFilter = isNotMutuallyBlockedSql('n.actor_id', '$1');
+    const chatFilter = includeChat ? '' : "AND n.type NOT IN ('message', 'new_message', 'chat')";
 
     const result = await db.query(
       `SELECT 
@@ -87,7 +89,7 @@ exports.getNotifications = async (req, res) => {
       FROM notifications n
       LEFT JOIN users u ON n.actor_id = u.id
       LEFT JOIN posts p ON n.post_id = p.id
-      WHERE n.user_id = $1 AND ${blockFilter}
+      WHERE n.user_id = $1 AND ${blockFilter} ${chatFilter}
       ORDER BY n.created_at DESC, n.id DESC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
@@ -96,7 +98,7 @@ exports.getNotifications = async (req, res) => {
     const unreadResult = await db.query(
       `SELECT COUNT(*)::int AS count
        FROM notifications n
-       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter}`,
+       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter} ${chatFilter}`,
       [userId]
     );
 
@@ -175,15 +177,17 @@ exports.markAsRead = async (req, res) => {
  */
 exports.getUnreadCount = async (req, res) => {
   const userId = req.user.id;
+  const includeChat = req.query.include_chat === 'true';
 
   try {
     await ensureUserBlocksTable();
     const blockFilter = isNotMutuallyBlockedSql('n.actor_id', '$1');
+    const chatFilter = includeChat ? '' : "AND n.type NOT IN ('message', 'new_message', 'chat')";
 
     const result = await db.query(
       `SELECT COUNT(*)::int AS count
        FROM notifications n
-       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter}`,
+       WHERE n.user_id = $1 AND n.is_read = FALSE AND ${blockFilter} ${chatFilter}`,
       [userId]
     );
 

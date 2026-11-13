@@ -151,3 +151,4 @@ module.exports = {
   createReport,
   ensureReportsTable,
 };
+

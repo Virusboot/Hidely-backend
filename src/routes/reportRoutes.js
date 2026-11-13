@@ -8,3 +8,4 @@ const reportController = require('../controllers/reportController');
 router.post('/', authMiddleware, reportLimiter, reportController.createReport);
 
 module.exports = router;
+
