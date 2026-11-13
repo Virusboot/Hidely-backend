@@ -100,7 +100,9 @@ exports.updateProfile = async (req, res) => {
   try {
     await ensureUsernameCooldownColumn();
 
-    const usernameClean = username ? username.trim().toLowerCase() : null;
+    const usernameClean = (username !== undefined && username !== null && username.toString().trim().length > 0)
+      ? username.toString().trim().toLowerCase()
+      : null;
 
     // Fetch current user details
     const currentUserRes = await db.query(
@@ -140,12 +142,12 @@ exports.updateProfile = async (req, res) => {
     const params = [];
     let paramIndex = 1;
 
-    if (name !== undefined) {
+    if (name !== undefined && name !== null && name.toString().trim().length > 0) {
       query += `name = $${paramIndex}, `;
-      params.push(name.trim());
+      params.push(name.toString().trim());
       paramIndex++;
     }
-    if (usernameClean !== undefined && usernameClean !== currentUsername) {
+    if (usernameClean && usernameClean !== currentUsername) {
       query += `username = $${paramIndex}, username_changed_at = CURRENT_TIMESTAMP, `;
       params.push(usernameClean);
       paramIndex++;
