@@ -14,6 +14,17 @@ const {
   stripTagFromCaptionSuffix,
 } = require('../utils/privacyHelper');
 
+let _usernameCooldownColumnChecked = false;
+async function ensureUsernameCooldownColumn() {
+  if (_usernameCooldownColumnChecked) return;
+  try {
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMP WITH TIME ZONE;`);
+    _usernameCooldownColumnChecked = true;
+  } catch (err) {
+    console.error('Error ensuring username_changed_at column:', err);
+  }
+}
+
 /**
  * Get current user profile details
  * GET /api/users/profile
@@ -22,6 +33,8 @@ exports.getProfile = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    await ensureUsernameCooldownColumn();
+
     const userResult = await db.query(
       `SELECT 
         u.id, 
@@ -33,6 +46,7 @@ exports.getProfile = async (req, res) => {
         u.bio, 
         u.profile_picture, 
         u.is_verified,
+        u.username_changed_at,
         (SELECT COUNT(*)::int FROM posts WHERE user_id = u.id) AS posts_count,
         (SELECT COUNT(*)::int FROM user_follows WHERE following_id = u.id) AS followers_count,
         (SELECT COUNT(*)::int FROM user_follows WHERE follower_id = u.id) AS followings_count
@@ -63,6 +77,7 @@ exports.getProfile = async (req, res) => {
         bio: row.bio,
         profile_picture: row.profile_picture,
         is_verified: isVerified,
+        username_changed_at: row.username_changed_at || null,
         posts_count: postsCount,
         followers_count: followersCount,
         followings_count: parseInt(row.followings_count || 0),
@@ -83,11 +98,35 @@ exports.updateProfile = async (req, res) => {
   const { name, username, pronouns, gender, bio } = req.body;
 
   try {
+    await ensureUsernameCooldownColumn();
+
     const usernameClean = username ? username.trim().toLowerCase() : null;
 
-    // Check if username is already taken by another user
-    if (usernameClean) {
-      const usernameCheck = await db.query('SELECT * FROM users WHERE username = $1 AND id != $2', [
+    // Fetch current user details
+    const currentUserRes = await db.query(
+      'SELECT username, username_changed_at FROM users WHERE id = $1',
+      [userId]
+    );
+    const currentUser = currentUserRes.rows[0] || {};
+    const currentUsername = (currentUser.username || '').toLowerCase().trim();
+
+    // Enforce 15-day cooldown if user is attempting to change username to a different handle
+    if (usernameClean && usernameClean !== currentUsername) {
+      if (currentUser.username_changed_at) {
+        const lastChanged = new Date(currentUser.username_changed_at).getTime();
+        const diffMs = Date.now() - lastChanged;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (diffDays < 15) {
+          const remainingDays = Math.ceil(15 - diffDays);
+          return res.status(400).json({
+            error: `You can only change your username once every 15 days. You can change it again in ${remainingDays} day${remainingDays === 1 ? '' : 's'}.`,
+            days_left: remainingDays,
+          });
+        }
+      }
+
+      // Check if username is already taken by another user
+      const usernameCheck = await db.query('SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2', [
         usernameClean,
         userId,
       ]);
@@ -106,8 +145,8 @@ exports.updateProfile = async (req, res) => {
       params.push(name.trim());
       paramIndex++;
     }
-    if (usernameClean !== undefined) {
-      query += `username = $${paramIndex}, `;
+    if (usernameClean !== undefined && usernameClean !== currentUsername) {
+      query += `username = $${paramIndex}, username_changed_at = CURRENT_TIMESTAMP, `;
       params.push(usernameClean);
       paramIndex++;
     }
@@ -141,7 +180,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     query = query.slice(0, -2);
-    query += ` WHERE id = $${paramIndex} RETURNING id, name, email, username, pronouns, COALESCE(gender, '') as gender, bio, profile_picture, is_verified`;
+    query += ` WHERE id = $${paramIndex} RETURNING id, name, email, username, pronouns, COALESCE(gender, '') as gender, bio, profile_picture, is_verified, username_changed_at`;
     params.push(userId);
 
     const updateResult = await db.query(query, params);

@@ -327,7 +327,8 @@ const startServer = async () => {
         ADD COLUMN IF NOT EXISTS manually_approve_tags BOOLEAN DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0,
         ADD COLUMN IF NOT EXISTS accepted_terms_at TIMESTAMP WITH TIME ZONE,
-        ADD COLUMN IF NOT EXISTS is_adult_confirmed BOOLEAN DEFAULT TRUE;
+        ADD COLUMN IF NOT EXISTS is_adult_confirmed BOOLEAN DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMP WITH TIME ZONE;
 
         ALTER TABLE otps
         ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0,
