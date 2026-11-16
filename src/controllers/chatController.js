@@ -439,7 +439,9 @@ exports.sendMessage = async (req, res) => {
       const fileNameOrPath = req.file.originalname || req.file.filename || req.file.path;
       const parts = fileNameOrPath.split('.');
       const ext = parts[parts.length - 1].toLowerCase();
-      if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+      if (type === 'voice' || ['m4a', 'mp3', 'wav', 'aac', 'ogg', 'opus', 'caf'].includes(ext)) {
+        mediaType = 'voice';
+      } else if (['mp4', 'mov', 'avi', 'mkv', 'flv'].includes(ext)) {
         mediaType = 'video';
       } else {
         mediaType = 'image';

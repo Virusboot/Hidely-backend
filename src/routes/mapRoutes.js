@@ -3,7 +3,7 @@ const router = express.Router();
 const https = require('https');
 const { mapLimiter } = require('../middleware/rateLimiter');
 
-const GOOGLE_MAPS_API_KEY = (process.env.GOOGLE_MAPS_API_KEY || '').trim();
+const GOOGLE_MAPS_API_KEY = (process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCNU24xs5Ky9uQ3pHfhyv9ofkjUd_o5_yI').trim();
 
 router.use(mapLimiter);
 
