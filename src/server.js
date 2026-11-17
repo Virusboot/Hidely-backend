@@ -339,6 +339,9 @@ const startServer = async () => {
         ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0,
         ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
 
+        ALTER TABLE messages
+        ADD COLUMN IF NOT EXISTS deleted_for_user_ids INTEGER[] DEFAULT '{}';
+
         CREATE TABLE IF NOT EXISTS content_reports (
           id SERIAL PRIMARY KEY,
           reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,

@@ -72,6 +72,7 @@ exports.getConversations = async (req, res) => {
         FROM messages m
         WHERE m.conversation_id = tc.id
           AND m.deleted_at IS NULL
+          AND NOT ($1 = ANY(COALESCE(m.deleted_for_user_ids, '{}')))
         ORDER BY m.created_at DESC, m.id DESC
         LIMIT 1
       ) lm ON TRUE
@@ -81,6 +82,7 @@ exports.getConversations = async (req, res) => {
         WHERE m.conversation_id = tc.id
           AND m.id > tc.last_read_message_id
           AND m.deleted_at IS NULL
+          AND NOT ($1 = ANY(COALESCE(m.deleted_for_user_ids, '{}')))
           AND m.sender_id != $1
       ) unr ON TRUE
       LEFT JOIN LATERAL (
@@ -298,6 +300,7 @@ exports.getMessages = async (req, res) => {
         FROM messages m
         WHERE m.conversation_id = $1
           AND m.deleted_at IS NULL
+          AND NOT ($3 = ANY(COALESCE(m.deleted_for_user_ids, '{}')))
         ORDER BY m.created_at DESC, m.id DESC
         LIMIT $2
       )
@@ -353,7 +356,7 @@ exports.getMessages = async (req, res) => {
         WHERE rm.id = tm.reply_to_message_id
       ) rep ON TRUE
       ORDER BY tm.created_at ASC, tm.id ASC`,
-      [conversationId, limit]
+      [conversationId, limit, userId]
     );
 
     res.json({ success: true, messages: messagesResult.rows });
@@ -805,5 +808,78 @@ exports.getIceServers = async (req, res) => {
   } catch (err) {
     console.error('[ChatController] Failed generating ICE server config');
     return res.status(500).json({ error: 'Failed to load ICE server configuration.' });
+  }
+};
+
+/**
+ * Delete Message (Delete for Me OR Unsend / Delete for Everyone)
+ * DELETE /api/chat/messages/:messageId
+ */
+exports.deleteMessage = async (req, res) => {
+  const userId = req.user.id;
+  const messageId = parseInt(req.params.messageId, 10);
+  const unsend = req.body?.unsend === true || req.query?.unsend === 'true';
+
+  if (!Number.isFinite(messageId) || messageId <= 0) {
+    return res.status(400).json({ error: 'Invalid message ID.' });
+  }
+
+  try {
+    const msgRes = await db.query(
+      'SELECT id, conversation_id, sender_id, text, deleted_at FROM messages WHERE id = $1',
+      [messageId]
+    );
+
+    if (msgRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Message not found.' });
+    }
+
+    const msg = msgRes.rows[0];
+
+    // Check membership in conversation
+    const memberCheck = await db.query(
+      'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+      [msg.conversation_id, userId]
+    );
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not authorized to delete this message.' });
+    }
+
+    if (unsend) {
+      // Unsend: only allowed for the sender
+      if (msg.sender_id !== userId) {
+        return res.status(403).json({ error: 'You can only unsend your own messages.' });
+      }
+
+      await db.query(
+        'UPDATE messages SET deleted_at = NOW() WHERE id = $1',
+        [messageId]
+      );
+
+      // Emit to conversation room so both parties see the message disappear
+      const io = getIo();
+      if (io) {
+        io.to(`conversation_${msg.conversation_id}`).emit('message_deleted', {
+          messageId,
+          conversationId: msg.conversation_id,
+          unsend: true,
+        });
+      }
+
+      return res.json({ success: true, messageId, unsend: true });
+    } else {
+      // Delete for Me
+      await db.query(
+        `UPDATE messages 
+         SET deleted_for_user_ids = array_append(COALESCE(deleted_for_user_ids, '{}'), $1) 
+         WHERE id = $2 AND NOT ($1 = ANY(COALESCE(deleted_for_user_ids, '{}')))`,
+        [userId, messageId]
+      );
+
+      return res.json({ success: true, messageId, unsend: false });
+    }
+  } catch (err) {
+    console.error('Error deleting message:', err);
+    res.status(500).json({ error: 'Failed to delete message.' });
   }
 };

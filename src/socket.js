@@ -8,6 +8,7 @@ const { getBlockStatus } = require('./utils/blockHelper');
 
 let io = null;
 const onlineUsers = new Map(); // String(userId) -> Set<socketId>
+const disconnectDebounceTimers = new Map(); // String(userId) -> Timeout
 const activeCallRooms = new Map(); // String(callId) -> { callId, callType, callerId, targetUserId, conversationId, participants: Map<String(userId), socketId> }
 
 function resolvePeerIdsFromRoom(room, senderKey, explicitTargetId) {
@@ -55,6 +56,12 @@ function initSocket(server) {
     const userKey = String(userId);
     console.log(`[Socket.IO] User connected: ${userId} (socket ${socket.id})`);
 
+    // Cancel pending disconnect timer if user reconnected within grace period
+    if (disconnectDebounceTimers.has(userKey)) {
+      clearTimeout(disconnectDebounceTimers.get(userKey));
+      disconnectDebounceTimers.delete(userKey);
+    }
+
     let userSockets = onlineUsers.get(userKey);
     const wasOffline = !userSockets || userSockets.size === 0;
     if (!userSockets) {
@@ -67,6 +74,17 @@ function initSocket(server) {
     if (wasOffline) {
       io.emit('presence_update', { userId: userKey, status: 'online' });
     }
+
+    // Immediately furnish connected socket with active online user roster
+    socket.emit('online_users_list', {
+      onlineUserIds: Array.from(onlineUsers.keys()),
+    });
+
+    socket.on('get_online_users', () => {
+      socket.emit('online_users_list', {
+        onlineUserIds: Array.from(onlineUsers.keys()),
+      });
+    });
 
     // Join conversation room
     socket.on('join_conversation', async (data) => {
@@ -349,30 +367,37 @@ function initSocket(server) {
       });
     }
 
-    // Disconnect
+    // Disconnect with grace period (avoids false-offline drops during web navigation/refreshes)
     socket.on('disconnect', () => {
       console.log(`[Socket.IO] User disconnected: ${userId} (socket ${socket.id})`);
       const sockets = onlineUsers.get(userKey);
       if (sockets) {
         sockets.delete(socket.id);
         if (sockets.size === 0) {
-          onlineUsers.delete(userKey);
-          io.emit('presence_update', { userId: userKey, status: 'offline' });
-          // Terminate active call rooms owned/joined by this user if fully offline
-          for (const callId of socket.activeCallIds) {
-            const room = activeCallRooms.get(callId);
-            if (room) {
-              const targets = resolvePeerIdsFromRoom(room, userKey, null);
-              for (const tid of targets) {
-                io.to(`user_${tid}`).emit('call_ended', {
-                  callId,
-                  senderId: userKey,
-                  reason: 'disconnected',
-                });
+          const timer = setTimeout(() => {
+            disconnectDebounceTimers.delete(userKey);
+            const remaining = onlineUsers.get(userKey);
+            if (!remaining || remaining.size === 0) {
+              onlineUsers.delete(userKey);
+              io.emit('presence_update', { userId: userKey, status: 'offline' });
+              // Terminate active call rooms owned/joined by this user if fully offline
+              for (const callId of socket.activeCallIds) {
+                const room = activeCallRooms.get(callId);
+                if (room) {
+                  const targets = resolvePeerIdsFromRoom(room, userKey, null);
+                  for (const tid of targets) {
+                    io.to(`user_${tid}`).emit('call_ended', {
+                      callId,
+                      senderId: userKey,
+                      reason: 'disconnected',
+                    });
+                  }
+                  activeCallRooms.delete(callId);
+                }
               }
-              activeCallRooms.delete(callId);
             }
-          }
+          }, 2500);
+          disconnectDebounceTimers.set(userKey, timer);
         }
       }
       socket.activeCallIds.clear();
