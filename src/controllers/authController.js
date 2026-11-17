@@ -279,29 +279,36 @@ exports.verifyOTP = async (req, res) => {
 /**
  * Login User
  * POST /api/auth/login
+ * Accepts email OR username alongside password
  */
 exports.login = async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, username, identifier, password } = req.body || {};
+  const rawIdentifier = (email || username || identifier || '').toString().trim();
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Please enter both email and password.' });
+  if (!rawIdentifier || !password) {
+    return res.status(400).json({ error: 'Please enter both username/email and password.' });
   }
 
   try {
-    const emailLower = email.toLowerCase().trim();
+    const idLower = rawIdentifier.toLowerCase();
+    const cleanUsername = idLower.startsWith('@') ? idLower.slice(1) : idLower;
 
-    // Check user exists
-    const userResult = await db.query('SELECT * FROM users WHERE email = $1', [emailLower]);
+    // Check user exists by email OR username
+    const userResult = await db.query(
+      'SELECT * FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $2 LIMIT 1',
+      [idLower, cleanUsername]
+    );
     if (userResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid email or password.' });
+      return res.status(400).json({ error: 'Invalid username/email or password.' });
     }
 
     const user = userResult.rows[0];
+    const userEmailLower = user.email.toLowerCase().trim();
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid email or password.' });
+      return res.status(400).json({ error: 'Invalid username/email or password.' });
     }
 
     // If not verified, require verification
@@ -309,14 +316,14 @@ exports.login = async (req, res) => {
       await ensureAuthSecurityColumns();
       const otpCode = generateOTP();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-      await db.query('DELETE FROM otps WHERE email = $1', [emailLower]);
+      await db.query('DELETE FROM otps WHERE email = $1', [userEmailLower]);
       await db.query(
         'INSERT INTO otps (email, otp_code, expires_at) VALUES ($1, $2, $3)',
-        [emailLower, otpCode, expiresAt]
+        [userEmailLower, otpCode, expiresAt]
       );
 
       // Send email containing OTP (non-blocking background task)
-      sendOTPEmail(emailLower, otpCode).catch(emailErr => {
+      sendOTPEmail(userEmailLower, otpCode).catch(emailErr => {
         console.error('Failed to send login verification OTP email:', emailErr);
       });
 

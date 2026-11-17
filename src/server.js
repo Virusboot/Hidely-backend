@@ -53,13 +53,18 @@ const staticCacheOptions = {
   },
 };
 
-// Serve static uploads folder (profile pictures, posts pictures)
+// Serve static uploads folder (profile pictures, posts pictures, audio/video)
 const fs = require('fs');
 const uploadsDir = path.join(__dirname, '../uploads');
+const rootUploadsDir = path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+if (!fs.existsSync(rootUploadsDir)) {
+  fs.mkdirSync(rootUploadsDir, { recursive: true });
+}
 app.use('/uploads', express.static(uploadsDir, staticCacheOptions));
+app.use('/uploads', express.static(rootUploadsDir, staticCacheOptions));
 app.use('/assets', express.static(path.join(__dirname, '../../assets'), staticCacheOptions));
 
 // Serve Web Admin Dashboard

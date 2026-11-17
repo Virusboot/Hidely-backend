@@ -27,7 +27,7 @@ function createStorage(prefixOverride = null) {
   });
 }
 
-// Strict file type filter (requires safe extension AND safe/known image/video MIME)
+// Strict file type filter (allows safe images, videos, and voice/audio files)
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
     'image/jpeg',
@@ -42,21 +42,40 @@ const fileFilter = (req, file, cb) => {
     'video/x-msvideo',
     'video/avi',
     'video/mpeg',
+    'audio/mp4',
+    'audio/m4a',
+    'audio/x-m4a',
+    'audio/aac',
+    'audio/webm',
+    'audio/ogg',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/opus',
+    'audio/3gpp',
   ];
   const ext = path.extname(file.originalname || '').toLowerCase();
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.mp4', '.mov', '.avi', '.mkv', '.mpeg'];
+  const allowedExtensions = [
+    '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif',
+    '.mp4', '.mov', '.avi', '.mkv', '.mpeg',
+    '.m4a', '.mp3', '.wav', '.aac', '.ogg', '.opus', '.webm', '.caf', '.3gp'
+  ];
   const mimeLower = (file.mimetype || '').toLowerCase().split(';')[0].trim();
 
   const extAllowed = allowedExtensions.includes(ext);
   const mimeAllowed =
     allowedMimeTypes.includes(mimeLower) ||
+    mimeLower.startsWith('audio/') ||
+    mimeLower.startsWith('image/') ||
+    mimeLower.startsWith('video/') ||
     mimeLower === 'application/octet-stream' ||
     mimeLower === 'binary/octet-stream';
 
   if (extAllowed && mimeAllowed) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only standard images and videos are allowed!'), false);
+    cb(new Error('Invalid file type. Only standard images, videos, and audio files are allowed!'), false);
   }
 };
 

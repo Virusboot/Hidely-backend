@@ -23,10 +23,16 @@ const uploadToCloudinary = async (localFilePath, folder = 'hidely') => {
     if (!localFilePath) return null;
 
     if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-      const response = await cloudinary.uploader.upload(localFilePath, {
+      // Race Cloudinary upload with a 10s timeout to avoid hanging chat media / audio delivery
+      const uploadPromise = cloudinary.uploader.upload(localFilePath, {
         folder: folder,
         resource_type: 'auto',
       });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Cloudinary upload timed out (10s)')), 10000)
+      );
+
+      const response = await Promise.race([uploadPromise, timeoutPromise]);
 
       if (fs.existsSync(localFilePath)) {
         try { fs.unlinkSync(localFilePath); } catch (_) {}
@@ -38,7 +44,7 @@ const uploadToCloudinary = async (localFilePath, folder = 'hidely') => {
     console.error('Cloudinary upload error, using local file fallback:', error.message || error);
   }
 
-  // Resilient fallback: Return local uploads path so post upload NEVER fails
+  // Resilient fallback: Return local uploads path so post/chat upload NEVER fails or hangs
   if (localFilePath && fs.existsSync(localFilePath)) {
     const filename = path.basename(localFilePath);
     return `/uploads/${filename}`;
