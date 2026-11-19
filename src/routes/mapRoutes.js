@@ -353,22 +353,69 @@ router.get('/places/textsearch', async (req, res) => {
   }
 });
 
-// 4. Directions Proxy
+// 4. Directions Proxy (With OSRM fallback)
 router.get('/directions', async (req, res) => {
   try {
     const { origin, destination, mode = 'driving', language = 'en', alternatives = 'true' } = req.query;
     if (!origin || !destination) {
       return res.status(400).json({ error: 'Origin and destination parameters are required' });
     }
-    if (!GOOGLE_MAPS_API_KEY) {
-      return res.status(200).json({ status: 'ZERO_RESULTS', routes: [] });
+
+    if (GOOGLE_MAPS_API_KEY) {
+      try {
+        let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=${mode}&language=${language}&alternatives=${alternatives}&key=${GOOGLE_MAPS_API_KEY}`;
+        if (mode === 'driving') {
+          url += '&departure_time=now&traffic_model=best_guess';
+        }
+        const result = await fetchJson(url);
+        if (result.body && result.body.status === 'OK' && result.body.routes && result.body.routes.length > 0) {
+          return res.status(result.statusCode).json(result.body);
+        }
+      } catch (gErr) {
+        console.warn('[MapProxy] Google Directions failed, using OSRM fallback:', gErr.message);
+      }
     }
-    let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=${mode}&language=${language}&alternatives=${alternatives}&key=${GOOGLE_MAPS_API_KEY}`;
-    if (mode === 'driving') {
-      url += '&departure_time=now&traffic_model=best_guess';
+
+    // Fallback: OSRM Routing
+    const partsOrigin = origin.split(',');
+    const partsDest = destination.split(',');
+    const startLat = parseFloat(partsOrigin[0]?.trim());
+    const startLng = parseFloat(partsOrigin[1]?.trim());
+    const endLat = parseFloat(partsDest[0]?.trim());
+    const endLng = parseFloat(partsDest[1]?.trim());
+
+    if (!isNaN(startLat) && !isNaN(startLng) && !isNaN(endLat) && !isNaN(endLng)) {
+      const osrmProfile = mode === 'driving' ? 'driving' : mode === 'bicycling' ? 'bike' : 'foot';
+      const osrmUrl = `https://router.project-osrm.org/route/v1/${osrmProfile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&steps=true`;
+      const osrmRes = await fetchJson(osrmUrl);
+      if (osrmRes.body && osrmRes.body.routes && osrmRes.body.routes.length > 0) {
+        const r = osrmRes.body.routes[0];
+        return res.status(200).json({
+          status: 'OK',
+          routes: [{
+            summary: 'OSRM Route',
+            legs: [{
+              distance: { value: Math.round(r.distance), text: `${(r.distance / 1000).toFixed(1)} km` },
+              duration: { value: Math.round(r.duration), text: `${Math.round(r.duration / 60)} mins` },
+              steps: (r.legs && r.legs[0] && r.legs[0].steps ? r.legs[0].steps : []).map(s => ({
+                html_instructions: s.maneuver ? `${s.maneuver.type || 'turn'} ${s.maneuver.modifier || ''} onto ${s.name || ''}` : 'Continue',
+                distance: { value: Math.round(s.distance || 0), text: `${Math.round(s.distance || 0)} m` },
+                duration: { value: Math.round(s.duration || 0), text: `${Math.round(s.duration || 0)} s` },
+                start_location: { lat: s.maneuver ? s.maneuver.location[1] : startLat, lng: s.maneuver ? s.maneuver.location[0] : startLng },
+                end_location: { lat: s.maneuver ? s.maneuver.location[1] : endLat, lng: s.maneuver ? s.maneuver.location[0] : endLng },
+                polyline: { points: '' }
+              }))
+            }],
+            overview_polyline: {
+              points: ''
+            },
+            geometry: r.geometry
+          }]
+        });
+      }
     }
-    const result = await fetchJson(url);
-    res.status(result.statusCode).json(result.body);
+
+    res.status(200).json({ status: 'ZERO_RESULTS', routes: [] });
   } catch (error) {
     console.error('[MapProxy] Directions error:', error);
     res.status(500).json({ error: 'Failed to get directions' });
